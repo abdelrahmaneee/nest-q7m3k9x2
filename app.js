@@ -173,7 +173,6 @@ const App = {
     const d = Dev.get();
     App.lessonKey = null; App.celeOK = true;
     let r = App.parse();
-    if (r[0] !== 'coach') CoachUI.open = false;
     const free = ['coach', 'coachsetup', 'who', 'newplayer'];
     if (d.role === 'coach' && !App.preview && !free.includes(r[0])) r = ['coach'];
     if (d.role !== 'coach' && !App.preview && !free.includes(r[0])) {
@@ -181,6 +180,7 @@ const App = {
       else if (!Kid.get().pledge) r = ['newplayer'];
     }
     if (!r.length) r = ['map'];
+    if (r[0] !== 'coach') CoachUI.open = false;
     if (r[0] === 'who' && Kid.pid() && Kid.get().pledge && !App.preview) { Kid.use(null); }
     App.route = r;
     const D = App.applyStage();

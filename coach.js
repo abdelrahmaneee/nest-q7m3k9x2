@@ -65,13 +65,33 @@ const CoachUI = {
     if (noPin) return {
       html: '<div class="card" style="margin-top:20px"><h2>لوحة المدرب لم تُجهّز بعد</h2><p>هذه اللوحة لأخيك الأكبر. إذا كنت المدرب، جهّزها الآن.</p><a class="btn" href="#/coachsetup">تجهيز المدرب</a></div>'
     };
-    const st = { pin: '' };
+    const st = { pin: '', busy: false };
+    const isCoachDev = Dev.get().role === 'coach';
     return {
-      html: '<div class="pin">' + ic('lock', 44) + '<h2>أدخل رمز المدرب</h2><div class="dots" id="pdots">' + '<i></i>'.repeat(4) + '</div><div class="keys">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => '<button data-n="' + n + '">' + n + '</button>').join('') + '<button data-n="x" aria-label="مسح">⌫</button><button data-n="0">0</button><button data-n="ok" aria-label="دخول">✓</button></div><p id="pm" class="muted"></p></div>',
+      html: '<div class="pin">' + ic('lock', 44) + '<h2>أدخل رمز المدرب</h2>' + (isCoachDev ? '<p class="muted" style="margin:0;font-size:.85em">هذا جهاز المدرب. اللوحة تُقفل وحدها لحماية بيانات أخويك.</p>' : '') + '<div class="dots" id="pdots">' + '<i></i>'.repeat(4) + '</div><div class="keys">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => '<button data-n="' + n + '">' + n + '</button>').join('') + '<button data-n="x" aria-label="مسح">⌫</button><button data-n="0">0</button><button data-n="ok" aria-label="دخول">✓</button></div><p id="pm" class="muted">اكتب الرمز ثم اضغط ✓</p>' +
+        (isCoachDev ? '<button class="btn sm sec" id="pforgot" style="margin-top:6px">نسيت الرمز؟</button>' : '<a class="btn sm sec" href="#/who" style="margin-top:6px">رجوع لشاشة اللاعبين</a>') + '</div>',
       mount() {
         const paint = () => { $('#pdots').innerHTML = Array.from({ length: Math.max(4, st.pin.length) }, (_, i) => '<i class="' + (i < st.pin.length ? 'on' : '') + '"></i>').join(''); };
-        const tryIt = async () => { if (await CoachUI.checkPin(st.pin)) { CoachUI.open = true; App.lastAct = now(); Snd.ok(); App.render(); } else if (st.pin.length >= 4) { $('#pm').textContent = 'الرمز غير صحيح'; Snd.bad(); st.pin = ''; paint(); } };
-        $('.keys').onclick = e => { const b = e.target.closest('[data-n]'); if (!b) return; const n = b.dataset.n; if (n === 'x') st.pin = st.pin.slice(0, -1); else if (n === 'ok') { tryIt(); return; } else if (st.pin.length < 8) st.pin += n; paint(); if (st.pin.length >= 4) tryIt(); };
+        const ok = () => { CoachUI.open = true; App.lastAct = now(); Snd.ok(); App.render(); };
+        // silent check while typing (supports 4–8 digits); errors only when ✓ is pressed or 8 digits are typed
+        const tryIt = async (final) => {
+          if (st.busy) return; st.busy = true; const good = await CoachUI.checkPin(st.pin); st.busy = false;
+          if (good) return ok();
+          if (final) { $('#pm').textContent = 'الرمز غير صحيح'; $('#pm').style.color = 'var(--bad)'; Snd.bad(); st.pin = ''; paint(); }
+        };
+        $('.keys').onclick = e => { const b = e.target.closest('[data-n]'); if (!b) return; const n = b.dataset.n; if (n === 'x') st.pin = st.pin.slice(0, -1); else if (n === 'ok') { if (st.pin.length) tryIt(true); return; } else if (st.pin.length < 8) st.pin += n; paint(); if (st.pin.length >= 4) tryIt(st.pin.length >= 8); };
+        const kd = e => { if (!$('.keys')) { document.removeEventListener('keydown', kd); return; } if (/^[0-9]$/.test(e.key) && st.pin.length < 8) { st.pin += e.key; paint(); if (st.pin.length >= 4) tryIt(st.pin.length >= 8); } else if (e.key === 'Backspace') { st.pin = st.pin.slice(0, -1); paint(); } else if (e.key === 'Enter' && st.pin.length) tryIt(true); };
+        document.addEventListener('keydown', kd);
+        const fg = $('#pforgot'); if (fg) fg.onclick = () => {
+          const m = modal('<h2>رمز مدرب جديد</h2><p class="muted">للتأكد أنك المدرب، اكتب <b>رمز الربط</b> الخاص بالعائلة، ثم الرمز الجديد.</p><input class="inp mono" id="rf" dir="ltr" placeholder="XXXX-XXXX-XXXX"><input class="inp mono" id="rp1" dir="ltr" type="password" inputmode="numeric" maxlength="8" placeholder="الرمز الجديد (4–8 أرقام)" style="margin-top:8px"><input class="inp mono" id="rp2" dir="ltr" type="password" inputmode="numeric" maxlength="8" placeholder="أعد كتابته" style="margin-top:8px"><p id="rm" style="color:var(--bad);font-weight:800;min-height:1.3em;margin:4px 0"></p><div class="row"><button class="btn" id="rok">حفظ</button><button class="btn sec" data-close>إلغاء</button></div>');
+          $('#rok', m.el).onclick = async () => {
+            const f = Views.normFam($('#rf', m.el).value || ''), p1 = $('#rp1', m.el).value.trim(), p2 = $('#rp2', m.el).value.trim();
+            if (!f || f !== Dev.get().fam) { $('#rm', m.el).textContent = 'رمز الربط غير صحيح'; return; }
+            if (!/^\d{4,8}$/.test(p1)) { $('#rm', m.el).textContent = 'من 4 إلى 8 أرقام'; return; }
+            if (p1 !== p2) { $('#rm', m.el).textContent = 'غير متطابقين'; return; }
+            await CoachUI.setPin(p1); m.close(); toast('تم تعيين الرمز الجديد ✅'); ok();
+          };
+        };
       }
     };
   },
