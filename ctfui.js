@@ -130,7 +130,7 @@ const CTF = {
     });
   },
   next() {
-    const D = App.derive(); if (!(D.solved.length >= C.ctf.length) && !App.preview && Dev.get().role !== 'coach') { setTimeout(() => App.go('ctf')); return {}; }
+    const D = App.derive(); if (!(D.solved.length >= C.ctf.length) && !App.preview) { setTimeout(() => App.go('ctf')); return {}; }
     let h = '<div class="row" style="margin:6px 0"><a class="btn sm sec" href="#/ctf">' + ic('back', 18) + 'الأعلام</a></div>';
     h += '<div class="hero">' + Art.eagle('happy', 6, true) + '<div class="bubble"><b>أنهيت عُقاب كله! 🏆</b><br>أنت الآن جاهز للساحات الحقيقية. هذه مواقع <b>قانونية وآمنة</b> صُنعت خصيصاً ليتدرّب فيها الناس على الاختراق، وكل ما فيها مسموح.</div></div>';
     h += '<div class="card"><h2 style="margin-top:0">1️⃣ أكاديمية CyLab للأمن (picoCTF سابقاً)</h2><p>من جامعة <b>كارنيغي ميلون</b> الأمريكية، وهي أشهر ساحة تدريب للطلاب في العالم. مجانية تماماً، وفيها مئات التحديات من نفس أنواع ما حللته هنا: <b>General Skills</b> (مهارات عامة) و <b>Cryptography</b> (تشفير) و <b>Web Exploitation</b> (ثغرات الويب) و <b>Forensics</b> (تحقيق).</p>' +

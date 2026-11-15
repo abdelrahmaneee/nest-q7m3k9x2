@@ -50,7 +50,7 @@ const CoachUI = {
     const ps = Prof.list();
     if (!CoachUI.sel || (CoachUI.sel !== '*' && !Prof.one(CoachUI.sel))) CoachUI.sel = ps[0] ? ps[0].id : null;
     const tabs = [['day', 'الأيام'], ['prog', 'التقدّم'], ['ctl', 'التحكّم'], ['msg', 'الرسائل والتحدي'], ['ply', 'اللاعبون'], ['data', 'البيانات']];
-    let h = '<div class="row" style="justify-content:space-between;margin-top:10px"><h1 style="margin:0">لوحة المدرب</h1><button class="btn sm sec" id="clk">' + ic('lock', 18) + 'قفل</button></div><p class="muted" style="margin:0;font-size:.85em">تُقفل وحدها عند الخروج منها أو بعد 3 دقائق بلا نشاط.</p>';
+    let h = '<div class="row" style="justify-content:space-between;margin-top:10px"><h1 style="margin:0">لوحة المدرب</h1><button class="btn sm sec" id="clk">' + ic('lock', 18) + 'قفل والخروج</button></div><p class="muted" style="margin:0;font-size:.85em">تُقفل وحدها عند الخروج منها أو بعد 3 دقائق بلا نشاط.</p>';
     h += '<div class="ctabs">' + tabs.map(t => '<button data-ct="' + t[0] + '" aria-pressed="' + (CoachUI.tab === t[0]) + '">' + t[1] + '</button>').join('') + '</div>';
     if (['day', 'prog', 'ctl'].includes(CoachUI.tab)) {
       if (!ps.length) return { html: h + '<div class="card">لا يوجد لاعبون بعد. أضف أخويك من تبويب «اللاعبون»، أو يضيف كل واحد منهما حسابه من جهازه.</div>', mount: CoachUI.mount };
@@ -68,8 +68,8 @@ const CoachUI = {
     const st = { pin: '', busy: false };
     const isCoachDev = Dev.get().role === 'coach';
     return {
-      html: '<div class="pin">' + ic('lock', 44) + '<h2>أدخل رمز المدرب</h2>' + (isCoachDev ? '<p class="muted" style="margin:0;font-size:.85em">هذا جهاز المدرب. اللوحة تُقفل وحدها لحماية بيانات أخويك.</p>' : '') + '<div class="dots" id="pdots">' + '<i></i>'.repeat(4) + '</div><div class="keys">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => '<button data-n="' + n + '">' + n + '</button>').join('') + '<button data-n="x" aria-label="مسح">⌫</button><button data-n="0">0</button><button data-n="ok" aria-label="دخول">✓</button></div><p id="pm" class="muted">اكتب الرمز ثم اضغط ✓</p>' +
-        (isCoachDev ? '<button class="btn sm sec" id="pforgot" style="margin-top:6px">نسيت الرمز؟</button>' : '<a class="btn sm sec" href="#/who" style="margin-top:6px">رجوع لشاشة اللاعبين</a>') + '</div>',
+      html: '<div class="pin">' + ic('lock', 44) + '<h2>أدخل رمز المدرب</h2>' + '<p class="muted" style="margin:0;font-size:.85em">اللوحة تُقفل وحدها لحماية بيانات أخويك.</p>' + '<div class="dots" id="pdots">' + '<i></i>'.repeat(4) + '</div><div class="keys">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => '<button data-n="' + n + '">' + n + '</button>').join('') + '<button data-n="x" aria-label="مسح">⌫</button><button data-n="0">0</button><button data-n="ok" aria-label="دخول">✓</button></div><p id="pm" class="muted">اكتب الرمز ثم اضغط ✓</p>' +
+        '<div class="row" style="justify-content:center;margin-top:6px"><a class="btn sm sec" href="' + (Kid.pid() ? '#/map' : '#/who') + '">رجوع</a>' + (isCoachDev ? '<button class="btn sm sec" id="pforgot">نسيت الرمز؟</button>' : '') + '</div>' + '</div>',
       mount() {
         const paint = () => { $('#pdots').innerHTML = Array.from({ length: Math.max(4, st.pin.length) }, (_, i) => '<i class="' + (i < st.pin.length ? 'on' : '') + '"></i>').join(''); };
         const ok = () => { CoachUI.open = true; App.lastAct = now(); Snd.ok(); App.render(); };
@@ -98,7 +98,7 @@ const CoachUI = {
   mount() {
     $$('[data-ct]').forEach(b => b.onclick = () => { CoachUI.tab = b.dataset.ct; App.render(); });
     $$('[data-ks]').forEach(b => b.onclick = () => { CoachUI.sel = b.dataset.ks; CoachUI.day = null; App.render(); });
-    $('#clk').onclick = () => { CoachUI.open = false; App.go(Dev.get().role === 'coach' ? 'coach' : 'who'); App.render(); };
+    $('#clk').onclick = () => { CoachUI.open = false; App.go(Kid.pid() ? 'map' : 'who'); App.render(); };
     const m = CoachUI['m_' + CoachUI.tab]; if (m) m();
   },
 
@@ -229,13 +229,11 @@ const CoachUI = {
     let h = '<div class="card"><h3 style="margin-top:0">🔗 رمز الربط</h3><div class="big-num mono" style="direction:ltr;font-size:1.6em">' + esc(d.fam || 'غير مربوط') + '</div><p>الحالة: <b>' + ({ local: 'على هذا الجهاز فقط', wait: 'جارٍ الاتصال', on: 'متصل ✅', fail: 'تعذّر الاتصال' }[Sync.status()]) + '</b></p><p class="muted">على جهاز أخيك: ملفي ← الإعدادات ← رمز الربط.</p></div>';
     h += '<div class="card"><h3 style="margin-top:0">💾 نسخة احتياطية</h3><p class="muted">ملف فيه كل تقدّمه. احفظه عندك من حين لآخر. الاستيراد <b>يدمج</b> ولا يحذف شيئاً.</p><div class="row"><button class="btn" id="cexp">' + ic('dl', 20) + 'تنزيل نسخة</button><label class="btn sec" style="cursor:pointer">استيراد نسخة<input type="file" id="cimp" accept=".json,application/json" hidden></label></div></div>';
     h += '<div class="card"><h3 style="margin-top:0">🔑 تغيير رمز المدرب</h3><input class="inp mono" id="cnp" dir="ltr" type="password" inputmode="numeric" maxlength="8" placeholder="الرمز الجديد"><button class="btn sec" id="cnps" style="margin-top:8px">حفظ</button></div>';
-    h += '<div class="card"><h3 style="margin-top:0">📱 هذا الجهاز</h3><p>نوعه: <b>' + (d.role === 'coach' ? 'جهاز المدرب (لا يُسجَّل عليه وقت)' : 'جهاز أخي') + '</b></p><button class="btn sec" id="crole">' + (d.role === 'coach' ? 'اجعله جهاز أخي' : 'اجعله جهاز المدرب') + '</button></div>';
     return h;
   },
   m_data() {
     $('#cexp').onclick = () => { const blob = new Blob([JSON.stringify({ app: 'oqab', v: SCHEMA, at: new Date().toISOString(), prof: Prof.get(), kids: Object.fromEntries(Object.keys(Prof.get().list).map(id => [id, Kid.of(id)])), coach: Coach.get() }, null, 1)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'oqab-backup-' + dayKey() + '.json'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); toast('تم التنزيل ✅'); };
     $('#cimp').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { const j = JSON.parse(await f.text()); if (j.app !== 'oqab') throw 0; if (j.prof) Prof.mergeIn(j.prof); if (j.kids) Object.keys(j.kids).forEach(id => Kid.mergeInto(id, j.kids[id])); if (j.kid) { const f = Prof.list()[0]; if (f) Kid.mergeInto(f.id, j.kid); } if (j.coach) Coach.mergeIn(j.coach); Coach.save(); Sync.schedule(); toast('تم الدمج ✅'); App.render(); } catch (x) { toast('الملف غير صالح'); } };
     $('#cnps').onclick = async () => { const p = $('#cnp').value.trim(); if (!/^\d{4,8}$/.test(p)) { toast('من 4 إلى 8 أرقام'); return; } await CoachUI.setPin(p); toast('تم تغيير الرمز ✅'); $('#cnp').value = ''; };
-    $('#crole').onclick = () => { const d = Dev.get(); Dev.set('role', d.role === 'coach' ? 'kid' : 'coach');  App.render(); };
   }
 };

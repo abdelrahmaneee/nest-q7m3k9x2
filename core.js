@@ -166,7 +166,7 @@ const Kid = (() => {
   function of(id) { if (!id) return emptyKid(); if (!cache[id]) cache[id] = migrateKid(LS.get(key(id), null)); return cache[id]; }
   let pid = SS.get('oqab_pid'); if (pid && !Prof.one(pid)) pid = null;
   let s = of(pid);
-  const live = () => !!pid && !App.preview && Dev.get().role !== 'coach';
+  const live = () => !!pid && !App.preview;
   function persist(id) { LS.set(key(id), cache[id]); }
   function save(cloud = true) { if (!pid) return; persist(pid); ls.forEach(f => f()); if (cloud) Sync.schedule(); }
   function ev(k, data) { if (!live()) return; const id = Dev.get().id + '_' + rid(6); s.E[id] = Object.assign({ t: now(), k }, data || {}); }

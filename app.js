@@ -63,7 +63,7 @@ const App = {
     if (CoachUI.open && idle > 180000) { CoachUI.open = false; if (App.route[0] === 'coach') App.render(); }
     // a player is signed out after 30 idle minutes (shared device)
     if (Kid.pid() && !App.preview && idle > 30 * 60000) { Kid.use(null); App.go('who'); return; }
-    if (document.hidden || App.preview || Dev.get().role === 'coach' || !Kid.pid()) return;
+    if (document.hidden || App.preview || !Kid.pid()) return;
     if (idle > 60000) return;
     if (!Kid.get().pledge) return;
     Kid.tick(5, App.lessonKey);
@@ -158,7 +158,7 @@ const App = {
   applyStage() {
     const d = App.derive(); const pid = Kid.pid(); const r = document.documentElement;
     const sn = App.seen();
-    const s2 = !!pid && d.stage2 && Dev.get().role !== 'coach' && !!(sn && sn.stage2) || (App.preview && d.stage2);
+    const s2 = !!pid && d.stage2 && !!(sn && sn.stage2) || (App.preview && d.stage2);
     if (s2) r.dataset.stage = '2'; else delete r.dataset.stage;
     const k = Kid.get(); const l1 = App.lookOf(k, false), l2 = App.lookOf(k, true);
     if (pid && l1.th !== 'sky') r.dataset.th = l1.th; else delete r.dataset.th;
@@ -174,8 +174,7 @@ const App = {
     App.lessonKey = null; App.celeOK = true;
     let r = App.parse();
     const free = ['coach', 'coachsetup', 'who', 'newplayer'];
-    if (d.role === 'coach' && !App.preview && !free.includes(r[0])) r = ['coach'];
-    if (d.role !== 'coach' && !App.preview && !free.includes(r[0])) {
+    if (!App.preview && !free.includes(r[0])) {
       if (!Kid.pid()) r = ['who'];
       else if (!Kid.get().pledge) r = ['newplayer'];
     }
@@ -188,7 +187,7 @@ const App = {
     const v = views[r[0]] || Views.map;
     const app = $('#app');
     const out = v(r, D) || {};
-    const showTop = !['who', 'newplayer', 'lesson', 'test', 'review', 'typing', 'coachsetup'].includes(r[0]) && !(r[0] === 'coach' && d.role === 'coach' && !App.preview) && Kid.pid();
+    const showTop = !['who', 'newplayer', 'lesson', 'test', 'review', 'typing', 'coachsetup'].includes(r[0]) && Kid.pid();
     const pv = App.preview && r[0] !== 'coach' && r[0] !== 'coachsetup';
     app.innerHTML = (showTop ? App.topHtml(D) : '') + (pv ? '<div class="card" style="background:var(--warn-bg);padding:8px 12px;margin:6px 0">' + ic('eye', 18) + ' <b>وضع المعاينة:</b> ترى ما يراه ' + esc((Prof.one(Kid.pid()) || {}).name || 'أخوك') + '، ولا يُسجَّل أي شيء. <button class="btn sm sec" data-act="preview-off">لوحة المدرب</button></div>' : '') + (out.html || '');
     App.paintTabs(r[0]);
@@ -212,7 +211,7 @@ const App = {
     el.className = 'sync ' + (s === 'on' ? 'on' : s === 'wait' ? 'wait' : ''); el.innerHTML = '<i></i>' + txt;
   },
   paintTabs(cur) {
-    const t = $('#tabs'); const d = Dev.get(); const hide = ['who', 'newplayer', 'lesson', 'test', 'review', 'typing', 'coachsetup'].includes(cur) || (!Kid.pid() && cur !== 'coach') || (d.role === 'coach' && !App.preview);
+    const t = $('#tabs'); const hide = ['who', 'newplayer', 'lesson', 'test', 'review', 'typing', 'coachsetup'].includes(cur) || !Kid.pid();
     t.classList.toggle('hide', hide); if (hide) return;
     const D = App.derive();
     const items = [['map', 'map', 'الرحلة'], ['today', 'sun', 'اليوم']];
@@ -251,7 +250,7 @@ const App = {
 
   /* ---------- celebrations (seen state is per player, per device) ---------- */
   checkCele() {
-    if (App.celeOn || App.preview || Dev.get().role === 'coach') return;
+    if (App.celeOn || App.preview) return;
     const pid = Kid.pid(); if (!pid || !Kid.get().pledge) return;
     const d = Dev.get(), D = App.derive(), k = Kid.get();
     d.seen = d.seen || {};
@@ -310,7 +309,7 @@ const App = {
     });
   },
   checkMsgs() {
-    if (App.preview || Dev.get().role === 'coach' || App.celeOn || $('.modal') || !Kid.pid()) return;
+    if (App.preview || App.celeOn || $('.modal') || !Kid.pid()) return;
     if (['lesson', 'test', 'ctfc', 'who', 'newplayer', 'review', 'typing'].includes(App.route[0])) return;
     const c = Coach.get(), k = Kid.get(), pid = Kid.pid();
     const unread = Object.entries(c.msgs || {}).filter(([id, m]) => (!m.to || m.to === '*' || m.to === pid) && !k.MR[id]).sort((a, b) => a[1].t - b[1].t);
@@ -339,7 +338,7 @@ const Views = {
     if (!fam) h += '<div class="card"><h3 style="margin-top:0">🔗 رمز الربط من أخيك الكبير</h3><p class="muted" style="margin:0 0 8px">اكتبه مرة واحدة على هذا الجهاز ليظهر حسابك وتقدّمك، ويتابعك أخوك.</p><div class="row" style="flex-wrap:nowrap"><input class="inp mono" id="wfam" dir="ltr" placeholder="XXXX-XXXX-XXXX"><button class="btn" id="wfb">ربط</button></div><p id="wfm" class="muted" style="font-size:.85em;margin:4px 0 0"></p></div>';
     h += '<div class="players">' + ps.map(p => { const k = Kid.of(p.id); const D = App.derive(p.id); return '<div class="player" data-p="' + p.id + '" role="button" tabindex="0">' + Art.eagle('happy', D.rank, false, App.lookOf(k, false)) + '<b>' + esc(p.name) + (lg && lg.king === p.id ? ' 👑' : '') + '</b><small class="muted">' + esc(RANKS[D.rank].n) + '</small></div>'; }).join('') +
       (Prof.freeId() && ps.length < 4 ? '<div class="player add" data-new="1" role="button" tabindex="0"><span style="font-size:40px">＋</span>لاعب جديد</div>' : '') + '</div>';
-    h += '<div class="sync" id="sync" style="justify-content:center"></div><p style="text-align:center;margin-top:24px"><a href="#/coach" class="muted" style="font-size:.85em">أنا المدرب (الأخ الأكبر)</a></p>';
+    h += '<div class="sync" id="sync" style="justify-content:center"></div><div style="text-align:center;margin-top:22px"><a class="btn sec" href="#/coach">' + ic('lock', 20) + 'لوحة المدرب</a></div>';
     return {
       html: h, mount() {
         $$('[data-p]').forEach(el => el.onclick = () => Views.login(el.dataset.p));
