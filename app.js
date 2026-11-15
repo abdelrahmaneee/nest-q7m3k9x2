@@ -189,7 +189,7 @@ const App = {
     const out = v(r, D) || {};
     const showTop = !['who', 'newplayer', 'lesson', 'test', 'review', 'typing', 'coachsetup'].includes(r[0]) && Kid.pid();
     const pv = App.preview && r[0] !== 'coach' && r[0] !== 'coachsetup';
-    app.innerHTML = (showTop ? App.topHtml(D) : '') + (pv ? '<div class="card" style="background:var(--warn-bg);padding:8px 12px;margin:6px 0">' + ic('eye', 18) + ' <b>وضع المعاينة:</b> ترى ما يراه ' + esc((Prof.one(Kid.pid()) || {}).name || 'أخوك') + '، ولا يُسجَّل أي شيء. <button class="btn sm sec" data-act="preview-off">لوحة المدرب</button></div>' : '') + (out.html || '');
+    app.innerHTML = (showTop ? App.topHtml(D) : '') + (pv ? '<div class="card" style="background:var(--warn-bg);padding:8px 12px;margin:6px 0">' + ic('eye', 18) + ' <b>وضع المعاينة:</b> ترى ما يراه ' + esc((Prof.one(Kid.pid()) || {}).name || 'لاعب جديد') + '، ولا يُسجَّل أي شيء. <button class="btn sm sec" data-act="preview-off">لوحة المدرب</button></div>' : '') + (out.html || '');
     App.paintTabs(r[0]);
     window.scrollTo(0, 0);
     if (out.mount) out.mount();

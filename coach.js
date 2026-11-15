@@ -53,9 +53,10 @@ const CoachUI = {
     let h = '<div class="row" style="justify-content:space-between;margin-top:10px"><h1 style="margin:0">لوحة المدرب</h1><button class="btn sm sec" id="clk">' + ic('lock', 18) + 'قفل والخروج</button></div><p class="muted" style="margin:0;font-size:.85em">تُقفل وحدها عند الخروج منها أو بعد 3 دقائق بلا نشاط.</p>';
     h += '<div class="ctabs">' + tabs.map(t => '<button data-ct="' + t[0] + '" aria-pressed="' + (CoachUI.tab === t[0]) + '">' + t[1] + '</button>').join('') + '</div>';
     if (['day', 'prog', 'ctl'].includes(CoachUI.tab)) {
-      if (!ps.length) return { html: h + '<div class="card">لا يوجد لاعبون بعد. أضف أخويك من تبويب «اللاعبون»، أو يضيف كل واحد منهما حسابه من جهازه.</div>', mount: CoachUI.mount };
+      if (!ps.length && CoachUI.tab !== 'ctl') return { html: h + '<div class="card">لا يوجد لاعبون بعد. أضف أخويك من تبويب «اللاعبون»، أو يضيف كل واحد منهما حسابه من جهازه.</div>', mount: CoachUI.mount };
+      if (!ps.length) CoachUI.sel = '*';
       const opts = (CoachUI.tab === 'ctl' ? [['*', 'الجميع']] : []).concat(ps.map(p => [p.id, p.name]));
-      if (CoachUI.tab !== 'ctl' && CoachUI.sel === '*') CoachUI.sel = ps[0].id;
+      if (CoachUI.tab !== 'ctl' && CoachUI.sel === '*' && ps[0]) CoachUI.sel = ps[0].id;
       h += '<div class="ctabs" style="margin-top:0">' + opts.map(o => '<button data-ks="' + o[0] + '" aria-pressed="' + (CoachUI.sel === o[0]) + '" style="border-style:dashed">' + (o[0] === '*' ? '👥 ' : '🧒 ') + esc(o[1]) + '</button>').join('') + '</div>';
     }
     h += CoachUI['t_' + CoachUI.tab](D);
@@ -176,7 +177,7 @@ const CoachUI = {
     if (C.final) h += '<tr><td>⭐ ' + esc(C.final.title) + '</td><td>' + (one ? (D.st.final.open ? '🔓' : '🔒') : '') + '</td><td>' + opt('final', cur('final')) + '</td></tr>';
     const s2 = c.ctfU[sc] ? c.ctfU[sc].m : '';
     h += '<tr><td>🚩 المرحلة الثانية (الأعلام)</td><td>' + (one ? (D.stage2 ? '🔓' : '🔒') : '') + '</td><td><select class="inp" id="cs2" style="width:auto;padding:4px 8px">' + [['', one ? 'حسب «الجميع» / تلقائي' : 'تلقائي'], ['open', 'مفتوحة'], ['lock', 'مقفلة']].map(o => '<option value="' + o[0] + '"' + (s2 === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></td></tr></tbody></table>';
-    h += '<div class="card"><h3 style="margin-top:0">معاينة</h3><p class="muted">تصفّح التطبيق كما يراه ' + (one ? esc(Prof.one(sc).name) : 'أخوك') + '، دون أن يُسجَّل شيء.</p>' + (one ? '<button class="btn sec" id="cprev">' + ic('eye', 20) + 'معاينة كـ' + esc(Prof.one(sc).name) + '</button> ' : '') + '<button class="btn sec" id="cpg">🎁 هدية الرتبة</button> <button class="btn sec" id="cpc">👑 تاج بطل الأسبوع</button> <button class="btn sec" id="cps2">🌙 دخول المرحلة الثانية</button></div>';
+    h += '<div class="card"><h3 style="margin-top:0">معاينة</h3><p class="muted">تصفّح التطبيق كما يراه ' + (one ? esc(Prof.one(sc).name) : 'لاعب جديد يبدأ من الصفر') + '، دون أن يُسجَّل أي شيء. وشاهد الهدايا والاحتفالات كما تظهر لأخويك.</p>' + (one ? '<button class="btn sec" id="cprev">' + ic('eye', 20) + 'معاينة كـ' + esc(Prof.one(sc).name) + '</button> ' : '<button class="btn sec" id="cdemo">' + ic('eye', 20) + 'عرض تجريبي (لاعب جديد)</button> ') + '<button class="btn sec" id="cpg">🎁 هدية الرتبة</button> <button class="btn sec" id="cpc">👑 تاج بطل الأسبوع</button> <button class="btn sec" id="cps2">🌙 دخول المرحلة الثانية</button></div>';
     return h;
   },
   m_ctl() {
@@ -184,6 +185,7 @@ const CoachUI = {
     $$('[data-u]').forEach(s => s.onchange = () => { const c = Coach.get(); c.U[sc] = c.U[sc] || {}; c.U[sc][s.dataset.u] = { m: s.value, u: now() }; Coach.save(); toast('تم الحفظ ✅'); App.render(); });
     $('#cs2').onchange = e => { const c = Coach.get(); c.ctfU[sc] = { m: e.target.value, u: now() }; Coach.save(); toast('تم الحفظ ✅'); App.render(); };
     const pv = $('#cprev'); if (pv) pv.onclick = () => App.startPreview(sc);
+    const dm = $('#cdemo'); if (dm) dm.onclick = () => App.startPreview('demo');
     $('#cpg').onclick = () => App.showCele(['rank', 3], true);
     $('#cpc').onclick = () => App.showCele(['crown', 1], true);
     $('#cps2').onclick = () => App.showCele(['stage2'], true);

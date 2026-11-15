@@ -163,8 +163,9 @@ const Prof = (() => {
 const Kid = (() => {
   const cache = {}; const ls = [];
   const key = id => K_KID + '_' + id;
-  function of(id) { if (!id) return emptyKid(); if (!cache[id]) cache[id] = migrateKid(LS.get(key(id), null)); return cache[id]; }
+  function of(id) { if (!id) return emptyKid(); if (id === 'demo') return tmp.demo || (tmp.demo = emptyKid()); if (!cache[id]) cache[id] = migrateKid(LS.get(key(id), null)); return cache[id]; }
   let pid = SS.get('oqab_pid'); if (pid && !Prof.one(pid)) pid = null;
+  const tmp = {};
   let s = of(pid);
   const live = () => !!pid && !App.preview;
   function persist(id) { LS.set(key(id), cache[id]); }
@@ -174,7 +175,7 @@ const Kid = (() => {
   let pushT = 0;
   return {
     get: () => s, of, pid: () => pid,
-    use(id, remember = true) { pid = id || null; s = of(pid); if (remember) SS.set('oqab_pid', pid); if (pid) { const bak = LS.get(K_BAK + '_' + pid, null); if (!bak || bak.day !== dayKey()) LS.set(K_BAK + '_' + pid, { day: dayKey(), kid: s }); } ls.forEach(f => f()); },
+    use(id, remember = true) { pid = id || null; s = of(pid); if (remember) SS.set('oqab_pid', pid); if (pid && pid !== 'demo') { const bak = LS.get(K_BAK + '_' + pid, null); if (!bak || bak.day !== dayKey()) LS.set(K_BAK + '_' + pid, { day: dayKey(), kid: s }); } ls.forEach(f => f()); },
     mergeInto(id, x) { const cur = of(id); const m = mergeKid(cur, x); const ch = !same(m, cur); cache[id] = m; if (id === pid) s = m; persist(id); if (ch) ls.forEach(f => f()); return ch; },
     mergeIn(x) { return pid ? Kid.mergeInto(pid, x) : false; },
     on(f) { ls.push(f); },
