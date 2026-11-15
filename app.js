@@ -1,0 +1,747 @@
+/* ===== عُقاب — app: rules, router, views ===== */
+'use strict';
+
+const RANKS = [
+  { n: 'مستكشف رقمي', x: 0 }, { n: 'متدرّب أمني', x: 300 }, { n: 'حارس الشبكة', x: 900 }, { n: 'محلّل أمني', x: 1800 },
+  { n: 'صائد الثغرات', x: 3000 }, { n: 'هاكر أخلاقي', x: 4500 }, { n: 'خبير أمن سيبراني', x: 6500 }
+];
+const DOMAINS = { pc: ['الحاسوب', '#2F6BD8'], safe: ['الأمان الشخصي', '#14A37F'], term: ['الطرفية', '#334155'], py: ['البرمجة', '#9B6BFF'], net: ['الشبكات', '#0EA5E9'], web: ['الويب', '#F97316'], cry: ['التشفير', '#C27C00'], mind: ['التفكير الأمني', '#E04B4B'], for: ['التحقيق الرقمي', '#0F766E'], ctf: ['التحديات', '#16A34A'], gen: ['عامة', '#64748B'] };
+const MEDALS = {
+  binary: { n: 'لغة الآلة', ic: '🔢', d: 'pc', how: 'اكتب اسمك بالثنائي' },
+  pcparts: { n: 'مهندس العتاد', ic: '🧩', d: 'pc', how: 'رتّب أجزاء الحاسوب كلها' },
+  phish: { n: 'صائد التصيّد', ic: '🎣', d: 'safe', how: 'اكشف كل علامات الرسالة المزيّفة' },
+  pwguard: { n: 'حارس كلمة المرور', ic: '🔐', d: 'safe', how: 'اصنع كلمة مرور قوية جداً' },
+  term: { n: 'سيد الطرفية', ic: '⌨️', d: 'term', how: 'أنهِ مهمة الطرفية الكبرى' },
+  firstcode: { n: 'أول سطر كود', ic: '🐍', d: 'py', how: 'شغّل أول برنامج لك' },
+  loops: { n: 'صانع الحلقات', ic: '🔁', d: 'py', how: 'اكتب حلقة تكرار صحيحة' },
+  funcs: { n: 'مهندس الدوال', ic: '🛠️', d: 'py', how: 'اصنع دالة تعمل' },
+  postman: { n: 'ساعي البريد الرقمي', ic: '📮', d: 'net', how: 'أوصل الرسالة كاملة عبر الشبكة' },
+  ports: { n: 'حارس المنافذ', ic: '🚪', d: 'net', how: 'أغلق المنافذ غير الضرورية' },
+  dns: { n: 'مستكشف DNS', ic: '📖', d: 'net', how: 'اعثر على عناوين المواقع' },
+  inspector: { n: 'مفتّش الكود', ic: '🔍', d: 'web', how: 'اعثر على السر داخل كود الصفحة' },
+  caesar: { n: 'كاسر شيفرة قيصر', ic: '🏛️', d: 'cry', how: 'فكّ رسالة قيصر' },
+  hash: { n: 'سيد الـHash', ic: '🧬', d: 'cry', how: 'اكتشف قوة البصمة' },
+  keys: { n: 'حارس المفاتيح', ic: '🗝️', d: 'cry', how: 'أرسل رسالة بالمفتاح العام' },
+  eagleeye: { n: 'عين العُقاب', ic: '🦅', d: 'mind', how: 'اكتشف كل نقاط الضعف في البيت' },
+  detective: { n: 'محقّق رقمي', ic: '🕵️', d: 'for', how: 'احلّ قضية الخادم المخترَق' },
+  flags: { n: 'صائد الأعلام', ic: '🚩', d: 'ctf', how: 'التقط 8 أعلام' },
+  flagmaster: { n: 'سيد الأعلام', ic: '🏆', d: 'ctf', how: 'التقط كل الأعلام' },
+  nohint: { n: 'بلا تلميحات', ic: '🧠', d: 'ctf', how: 'التقط 5 أعلام دون تلميح' },
+  typer: { n: 'أصابع البرق', ic: '⚡', d: 'gen', how: 'اكتب 25 كلمة في الدقيقة' },
+  streak7: { n: 'أسبوع النار', ic: '🔥', d: 'gen', how: '7 أيام متتالية' },
+  streak30: { n: 'شهر الحديد', ic: '🛡️', d: 'gen', how: '30 يوماً متتالياً' },
+  stage1: { n: 'خرّيج المرحلة الأولى', ic: '🎓', d: 'gen', how: 'أنهِ مشروع المرحلة الأولى' }
+};
+
+const App = {
+  preview: false, route: [], celeQ: [], celeOn: false, lessonKey: null, busy: false,
+
+  boot() {
+    buildIndex();
+    const d = Dev.get();
+    if (d.big) document.documentElement.dataset.big = '1';
+    window.addEventListener('hashchange', () => App.render());
+    Kid.on(() => App.onKid());
+    Coach.on(() => App.onCoach());
+    document.addEventListener('pointerdown', () => { App.lastAct = now(); }, true);
+    document.addEventListener('keydown', () => { App.lastAct = now(); }, true);
+    document.addEventListener('click', App.onClick);
+    document.addEventListener('mouseover', e => { const t = e.target.closest && e.target.closest('.term'); if (t) App.termTip(t, false); });
+    App.lastAct = now();
+    setInterval(App.tick, 5000);
+    if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
+    App.render();
+  },
+  cloudReady(m) { Sync.attach(m); },
+  cloudFail() { Sync.fail(); },
+  tick() {
+    if (document.hidden || App.preview || Dev.get().role === 'coach') return;
+    if (now() - App.lastAct > 60000) return;
+    if (!Kid.get().pledge) return;
+    Kid.tick(5, App.lessonKey);
+    if (Math.random() < .2) Sync.schedule();
+  },
+  refresh() { if (App.route[0] === 'lesson' || App.route[0] === 'test' || App.route[0] === 'ctfc' || App.route[0] === 'review' || App.route[0] === 'typing') { App.paintTop(); return; } App.render(); },
+  onKid() { App.paintTop(); App.checkCele(); },
+  onCoach() { App.applyStage(); if (App.route[0] === 'today' || App.route[0] === 'map' || App.route[0] === 'coach') { /* light refresh */ } App.checkMsgs(); },
+
+  /* ---------- derived ---------- */
+  derive() {
+    const k = Kid.get(), c = Coach.get();
+    const units = C.units;
+    let xp = 0;
+    const lessonsDone = {};
+    for (const key in k.L) if (k.L[key].d) { xp += 20; lessonsDone[key] = 1; }
+    for (const u in k.T) if (k.T[u].p) xp += 100 + Math.max(0, (k.T[u].b || 0) - 80) * 2;
+    for (const m in k.M) if (MEDALS[m]) xp += 50;
+    for (const id in k.C) if (k.C[id].d) { const ch = C.ctf.find(x => x.id === id); if (ch) xp += Math.max(Math.round(ch.pts / 2), ch.pts - 15 * (k.C[id].h || 0)); }
+    const active = {};
+    for (const day in k.D) {
+      const devs = k.D[day]; const tk = {}; let rx = 0, ty = 0;
+      for (const dv in devs) { Object.assign(tk, devs[dv].k || {}); rx = Math.max(rx, devs[dv].rx || 0); ty = Math.max(ty, devs[dv].ty || 0); }
+      if (tk.typing) xp += 10; if (tk.review) xp += 10; xp += Math.min(20, rx * 2);
+      const n = (tk.typing ? 1 : 0) + (tk.review ? 1 : 0) + (tk.lesson ? 1 : 0);
+      if (n === 3) xp += 20;
+      if (n >= 2) active[day] = n;
+    }
+    for (const w in k.W) xp += 50;
+    if (k.X.final) xp += 200;
+    // streak
+    let streak = 0; const today = dayKey();
+    let cur = active[today] ? today : addDays(today, -1);
+    while (active[cur]) { streak++; cur = addDays(cur, -1); }
+    let rank = 0; RANKS.forEach((r, i) => { if (xp >= r.x) rank = i; });
+    // unlocks
+    const st = {};
+    units.forEach((u, i) => {
+      const prev = units[i - 1];
+      let open = i === 0 || !!(k.T[prev.id] && k.T[prev.id].p);
+      const ov = c.U[u.id] && c.U[u.id].m;
+      if (ov === 'open') open = true; if (ov === 'lock') open = false;
+      const ld = u.lessons.filter(l => k.L[u.id + '.' + l.id] && k.L[u.id + '.' + l.id].d).length;
+      st[u.id] = { open, ld, total: u.lessons.length, passed: !!(k.T[u.id] && k.T[u.id].p), best: (k.T[u.id] && k.T[u.id].b) || 0, ov };
+    });
+    const last = units[units.length - 1];
+    let finalOpen = !!(k.T[last.id] && k.T[last.id].p);
+    const fov = c.U.final && c.U.final.m; if (fov === 'open') finalOpen = true; if (fov === 'lock') finalOpen = false;
+    const fl = C.final ? C.final.lessons.filter(l => k.L['final.' + l.id] && k.L['final.' + l.id].d).length : 0;
+    st.final = { open: finalOpen, ld: fl, total: C.final ? C.final.lessons.length : 0, passed: !!k.X.final, ov: fov };
+    let stage2 = !!k.X.final;
+    const cu = c.ctfU && c.ctfU.m; if (cu === 'open') stage2 = true; if (cu === 'lock') stage2 = false;
+    const solved = Object.keys(k.C).filter(id => k.C[id].d && C.ctf.some(x => x.id === id));
+    return { xp, rank, streak, active, st, stage2, solved, lessonsDone };
+  },
+  rankInfo(xp) { let r = 0; RANKS.forEach((x, i) => { if (xp >= x.x) r = i; }); const nx = RANKS[r + 1]; return { i: r, cur: RANKS[r], next: nx, pct: nx ? Math.round((xp - RANKS[r].x) / (nx.x - RANKS[r].x) * 100) : 100 }; },
+  applyStage() { const d = App.derive(); const s2 = d.stage2 && Dev.get().role !== 'coach' ? (Dev.get().seen && Dev.get().seen.stage2 ? '2' : '') : ''; if (s2) document.documentElement.dataset.stage = '2'; else delete document.documentElement.dataset.stage; return d; },
+
+  /* ---------- router ---------- */
+  go(h) { if (location.hash === '#' + h) App.render(); else location.hash = h; },
+  parse() { const h = (location.hash || '').replace(/^#\/?/, ''); return h ? h.split('/').map(decodeURIComponent) : []; },
+  render() {
+    const k = Kid.get(), d = Dev.get();
+    App.lessonKey = null; App.celeOK = true;
+    let r = App.parse();
+    if (d.role !== 'coach' && !k.pledge && r[0] !== 'coach' && r[0] !== 'coachsetup') r = ['welcome'];
+    if (!r.length) r = [d.role === 'coach' && !App.preview ? 'coach' : 'map'];
+    App.route = r;
+    const D = App.applyStage();
+    const views = { welcome: Views.welcome, map: Views.map, unit: Views.unit, lesson: Views.lesson, test: Views.test, today: Views.today, review: Views.review, typing: Views.typing, glossary: Views.glossary, me: Views.me, coach: CoachUI.view, coachsetup: CoachUI.setup, ctf: Views.ctf, ctfc: Views.ctfc, next: Views.next, weekly: Views.weekly };
+    const v = views[r[0]] || Views.map;
+    const app = $('#app');
+    const out = v(r, D) || {};
+    const showTop = r[0] !== 'welcome' && r[0] !== 'lesson' && r[0] !== 'test' && r[0] !== 'review' && r[0] !== 'typing';
+    app.innerHTML = (showTop ? App.topHtml(D) : '') + ((App.preview || d.role === 'coach') && r[0] !== 'coach' && r[0] !== 'coachsetup' ? '<div class="card" style="background:var(--warn-bg);padding:8px 12px;margin:6px 0">' + ic('eye', 18) + ' <b>وضع المعاينة:</b> ترى ما يراه أخوك، ولا يُسجَّل أي شيء. <button class="btn sm sec" data-act="preview-off">لوحة المدرب</button></div>' : '') + (out.html || '');
+    App.paintTabs(r[0]);
+    window.scrollTo(0, 0);
+    if (out.mount) out.mount();
+    App.paintSync();
+    setTimeout(() => { App.checkCele(); App.checkMsgs(); }, 400);
+  },
+  topHtml(D) {
+    const night = document.documentElement.dataset.stage === '2';
+    return '<header class="top"><a class="brand" href="#/map">' + Art.logo(night) + '<span>' + (night ? 'عُقاب 🌙' : 'عُقاب') + '</span></a><span class="sp"></span>' +
+      '<span class="chip" title="سلسلة الأيام">' + ic('fire', 18) + '<span id="t-streak">' + D.streak + '</span></span>' +
+      '<span class="chip" title="نقاط الخبرة">' + ic('star', 18) + '<span id="t-xp">' + D.xp + '</span></span></header><div class="sync" id="sync"></div>';
+  },
+  paintTop() { const D = App.derive(); const a = $('#t-xp'), b = $('#t-streak'); if (a) a.textContent = D.xp; if (b) b.textContent = D.streak; },
+  paintSync() {
+    const el = $('#sync'); if (!el) return; const s = Sync.status();
+    const txt = { local: 'محفوظ على هذا الجهاز', wait: 'جارٍ الاتصال...', on: 'متصل ومحفوظ', fail: 'محفوظ على هذا الجهاز (بلا اتصال)' }[s];
+    el.className = 'sync ' + (s === 'on' ? 'on' : s === 'wait' ? 'wait' : ''); el.innerHTML = '<i></i>' + txt;
+  },
+  paintTabs(cur) {
+    const t = $('#tabs'); const d = Dev.get(); const hide = ['welcome', 'lesson', 'test', 'review', 'typing', 'coachsetup'].includes(cur);
+    t.classList.toggle('hide', hide); if (hide) return;
+    const D = App.derive();
+    const items = [['map', 'map', 'الرحلة'], ['today', 'sun', 'اليوم']];
+    if (D.stage2) items.push(['ctf', 'flag', 'الأعلام']);
+    items.push(['glossary', 'book', 'القاموس'], ['me', 'hat', 'ملفي'], ['coach', d.role === 'coach' ? 'unlock' : 'lock', 'المدرب']);
+    const map = { unit: 'map', ctfc: 'ctf', next: 'ctf', weekly: 'today' };
+    const c = map[cur] || cur;
+    t.innerHTML = '<div class="in">' + items.map(i => '<a href="#/' + i[0] + '"' + (c === i[0] ? ' aria-current="page"' : '') + '>' + ic(i[1]) + i[2] + '</a>').join('') + '</div>';
+  },
+
+  onClick(e) {
+    const a = e.target.closest('[data-act]');
+    const tm = e.target.closest('.term');
+    if (tm && !a) { App.termTip(tm, true); return; }
+    if (!a) return;
+    const act = a.dataset.act, v = a.dataset.v;
+    Snd.click();
+    switch (act) {
+      case 'go': App.go(v); break;
+      case 'sound': Dev.set('sound', Dev.get().sound ? 0 : 1); App.render(); break;
+      case 'big': Dev.set('big', Dev.get().big ? 0 : 1); if (Dev.get().big) document.documentElement.dataset.big = '1'; else delete document.documentElement.dataset.big; App.render(); break;
+      case 'preview-off': App.preview = false; App.go('coach'); break;
+      case 'cert': Cert.make(+v); break;
+      case 'link': Views.linkDialog(); break;
+    }
+  },
+  termTip(el, click) {
+    const t = C.terms[el.dataset.term]; if (!t) return;
+    if (!click) { el.title = t.ar + (t.en ? ' (' + t.en + ')' : '') + ': ' + t.d; return; }
+    modal('<h2>' + esc(t.ar) + (t.en ? ' <span class="mono muted" style="font-size:.7em">(' + esc(t.en) + ')</span>' : '') + '</h2><p>' + md(t.d) + '</p>' + (t.ex ? '<p class="muted">مثال: ' + md(t.ex) + '</p>' : '') + '<button class="btn wide" data-close>فهمت</button>');
+  },
+
+  /* ---------- celebrations ---------- */
+  checkCele() {
+    if (App.celeOn || App.preview || Dev.get().role === 'coach') return;
+    if (!Kid.get().pledge) return;
+    const d = Dev.get(), D = App.derive(), k = Kid.get();
+    if (!d.seen) { d.seen = { rank: D.rank, medals: Object.assign({}, k.M), stage2: D.stage2, s1: !!k.X.final }; Dev.save(); return; }
+    const s = d.seen; const q = [];
+    for (const m in k.M) if (!s.medals[m] && MEDALS[m]) q.push(['medal', m]);
+    if (D.rank > s.rank) q.push(['rank', D.rank]);
+    if (D.rank < s.rank) { s.rank = D.rank; Dev.save(); }
+    if (D.stage2 && !s.stage2) q.push(['stage2']);
+    if (!D.stage2 && s.stage2) { s.stage2 = false; Dev.save(); App.applyStage(); }
+    if (!q.length) return;
+    const busy = ['lesson', 'test', 'ctfc', 'review', 'typing'].includes(App.route[0]) && !App.celeOK;
+    if (busy) return;
+    App.showCele(q[0]);
+  },
+  showCele(item) {
+    App.celeOn = true; const s = Dev.get().seen; const [kind, val] = item;
+    const el = document.createElement('div'); el.className = 'cele';
+    const finish = () => {
+      if (kind === 'medal') s.medals[val] = 1; else if (kind === 'rank') s.rank = val; else if (kind === 'stage2') s.stage2 = true;
+      Dev.save(); el.remove(); App.celeOn = false;
+      if (kind === 'stage2') { App.applyStage(); App.go('ctf'); } else { App.render(); }
+    };
+    if (kind === 'stage2') {
+      el.classList.add('stage2-intro');
+      el.innerHTML = '<div style="max-width:520px"><p id="s2a" style="opacity:0;transition:opacity 1s;font-size:1.2em">أنهيت المرحلة الأولى...<br>أصبحت تفهم كيف يعمل كل شيء.</p><div id="s2b" style="opacity:0;transition:opacity 1s">' + Art.eagle('wow', 6, true).replace('class="eagle"', 'class="eagle" style="width:150px"') + '<div class="glitch">صيد الأعلام</div><p>الآن يتغيّر كل شيء: الليل نزل، وعُقاب صار صيّاداً.<br>تحديات حقيقية داخل عالم وهمي آمن. كل علم تلتقطه يثبت مهارتك.</p><button class="btn wide" data-x="go">ابدأ الصيد</button></div></div>';
+      document.body.appendChild(el); Snd.whoosh();
+      setTimeout(() => { $('#s2a', el).style.opacity = 1; }, 200);
+      setTimeout(() => { $('#s2a', el).style.opacity = 0; document.documentElement.dataset.stage = '2'; }, 2600);
+      setTimeout(() => { $('#s2b', el).style.opacity = 1; Snd.fanfare(); confetti(120); }, 3400);
+      el.addEventListener('click', e => { if (e.target.closest('[data-x="go"]')) finish(); });
+      return;
+    }
+    const prize = kind === 'medal' ? Art.medal(MEDALS[val].ic, (DOMAINS[MEDALS[val].d] || DOMAINS.gen)[1]) : Art.hat(val);
+    const title = kind === 'medal' ? 'ميدالية جديدة!' : 'رتبة جديدة!';
+    const sub = kind === 'medal' ? '<p style="font-size:1.4em;font-weight:800">' + esc(MEDALS[val].n) + '</p><p>' + esc(MEDALS[val].how) + '</p>' : '<p style="font-size:1.4em;font-weight:800">' + esc(RANKS[val].n) + '</p><p>قبعتك البيضاء تطوّرت! ' + (RANKS[val + 1] ? 'الرتبة التالية: ' + RANKS[val + 1].n : 'وصلت لأعلى رتبة!') + '</p>';
+    el.innerHTML = '<div class="rays"></div><p style="position:relative;opacity:.85">هدية من عُقاب</p><h2 style="position:relative">اضغط على الهدية لتفتحها</h2>' +
+      '<button class="gift" aria-label="افتح الهدية"><svg viewBox="0 0 170 170"><rect x="25" y="70" width="120" height="90" rx="12" fill="#E04B4B" stroke="#7A1A1A" stroke-width="5"/><rect x="77" y="70" width="16" height="90" fill="#FFD36B"/><g class="lid"><rect x="15" y="48" width="140" height="30" rx="10" fill="#FF6B6B" stroke="#7A1A1A" stroke-width="5"/><rect x="77" y="48" width="16" height="30" fill="#FFD36B"/><path d="M85 48 q-30 -36 -40 -8 q10 10 40 8 q30 2 40 -8 q-10 -28 -40 8" fill="#FFD36B" stroke="#C27C00" stroke-width="4"/></g></svg></button>' +
+      '<div class="after hide" style="position:relative"><div class="prize">' + prize + '</div><h2>' + title + '</h2>' + sub + '<button class="btn gold" data-x="ok" style="min-width:200px">رائع!</button></div>';
+    document.body.appendChild(el);
+    el.addEventListener('click', e => {
+      const g = e.target.closest('.gift');
+      if (g && !g.classList.contains('open')) {
+        g.classList.add('open'); Snd.fanfare(); confetti(); if (navigator.vibrate) try { navigator.vibrate([60, 40, 120]); } catch (x) { }
+        setTimeout(() => { g.style.display = 'none'; $('h2', el).style.display = 'none'; $('.after', el).classList.remove('hide'); }, 650);
+      }
+      if (e.target.closest('[data-x="ok"]')) finish();
+    });
+  },
+  checkMsgs() {
+    if (App.preview || Dev.get().role === 'coach' || App.celeOn || $('.modal')) return;
+    if (['lesson', 'test', 'ctfc', 'welcome', 'review', 'typing'].includes(App.route[0])) return;
+    const c = Coach.get(), k = Kid.get();
+    const unread = Object.entries(c.msgs || {}).filter(([id, m]) => !k.MR[id]).sort((a, b) => a[1].t - b[1].t);
+    if (!unread.length) return;
+    const [id, m] = unread[0];
+    Snd.win();
+    modal('<div style="text-align:center">' + Art.eagle('happy', App.derive().rank).replace('class="eagle"', 'class="eagle" style="width:90px"') + '<p class="muted" style="margin:0">رسالة من أخيك</p></div><div class="card" style="font-size:1.12em;font-weight:700;white-space:pre-wrap">' + esc(m.x) + '</div><button class="btn wide" data-close>شكراً!</button>', { sticky: true, onClose: () => { Kid.msgRead(id); setTimeout(App.checkMsgs, 300); } });
+  }
+};
+
+/* ---------- lookups ---------- */
+function unitById(id) { return id === 'final' ? C.final : C.units.find(u => u.id === id); }
+const QIDX = {};
+function buildIndex() {
+  const add = (u) => u.lessons.forEach(l => l.steps.forEach((s, i) => { if (s.t === 'q' || s.t === 'in') QIDX[u.id + '.' + l.id + '.' + i] = { s, u, l }; }));
+  C.units.forEach(add); if (C.final) add(C.final);
+  C.units.forEach(u => (u.test || []).forEach((s, i) => { QIDX[u.id + '.t.' + i] = { s, u, l: null }; }));
+}
+
+/* ---------- views ---------- */
+const Views = {
+  welcome(r) {
+    const k = Kid.get();
+    const step = App.wstep || 0;
+    let h = '<div style="padding-top:20px">';
+    if (step === 0) {
+      h += '<div style="text-align:center">' + Art.eagle('happy', 0).replace('class="eagle"', 'class="eagle" style="width:170px"') + '<h1>أهلاً بك! أنا عُقاب</h1></div>' +
+        '<div class="card"><p>أنا عُقاب آلي، أحرس <b>عُشّ البيانات</b>.</p><p>العُقاب يرى من السماء ما لا يراه أحد. وأنا سأعلّمك أن ترى الحاسوب والإنترنت بعين العُقاب: كيف يعمل كل شيء من الداخل، وأين تختبئ الثغرات، وكيف نسدّها.</p><p>رحلتنا طويلة وممتعة. نبدأ من الصفر، خطوة خطوة، وكل درس لعبة تلعبها بنفسك.</p></div>' +
+        '<button class="btn wide" data-w="1">هيا نبدأ!</button><p style="text-align:center;margin-top:28px"><a href="#/coachsetup" class="muted" style="font-size:.85em">أنا المدرب (الأخ الأكبر)</a></p>';
+    } else if (step === 1) {
+      h += '<div class="mentor">' + Art.eagle('think', 0) + '<div class="bubble">قبل أن ندخل، هذا عهد بيني وبينك. اقرأه جيداً.</div></div>' +
+        '<div class="card"><h2 style="text-align:center">عهد عُقاب</h2>' +
+        '<div class="warn-card">كل ما أتعلّمه هنا أجرّبه <u>داخل عُقاب فقط</u>.<br>لا أجرّبه أبداً على أي موقع أو جهاز أو حساب حقيقي.</div>' +
+        '<p style="margin-top:12px">لماذا؟ لأن تجربة هذه الأشياء على أنظمة الآخرين <b>مخالفة للقانون</b>، حتى لو كانت مزاحاً أو فضولاً.</p>' +
+        '<p>داخل عُقاب كل شيء وهمي وآمن: الطرفية، والشبكة، والمواقع. جرّب فيها ما تشاء.</p>' +
+        '<p>وإذا رأيت شيئاً غريباً في موقع حقيقي، أخبر أخاك ولا تجرّب عليه شيئاً.</p>' +
+        '<label class="row" style="margin-top:10px;font-weight:800;cursor:pointer"><input type="checkbox" id="agree" style="width:24px;height:24px"> قرأت العهد وأوافق عليه</label></div>' +
+        '<button class="btn wide" data-w="2" id="agreeBtn" disabled>أعاهدك يا عُقاب</button>';
+    } else {
+      h += '<div class="mentor">' + Art.eagle('happy', 0) + '<div class="bubble">ممتاز! بماذا أناديك؟ (اكتب اسمك أو لقبك)</div></div>' +
+        '<div class="card"><input class="inp" id="nm" maxlength="20" placeholder="مثلاً: البطل" value="' + esc(k.name || '') + '">' +
+        '<p class="muted" style="font-size:.9em;margin-top:12px">إذا أعطاك أخوك <b>رمز الربط</b>، اكتبه هنا ليتابع تقدّمك. يمكنك إضافته لاحقاً من «ملفي».</p>' +
+        '<input class="inp mono" id="fam" placeholder="XXXX-XXXX-XXXX" dir="ltr" value="' + esc(Dev.get().fam || '') + '"><p id="famMsg" class="muted" style="font-size:.85em"></p></div>' +
+        '<button class="btn wide" data-w="3">انطلق!</button>';
+    }
+    h += '</div>';
+    return {
+      html: h, mount() {
+        $$('[data-w]').forEach(b => b.onclick = async () => {
+          const s = +b.dataset.w;
+          if (s === 3) {
+            const n = $('#nm').value.trim(); const f = $('#fam').value.trim();
+            if (f) { const ok = await Views.linkFamily(f, $('#famMsg')); if (!ok) return; }
+            if (n) Kid.setName(n);
+            Kid.pledge(); App.wstep = 0; Snd.win(); confetti(60); App.go('map'); return;
+          }
+          App.wstep = s; App.render();
+        });
+        const ag = $('#agree'); if (ag) ag.onchange = () => { $('#agreeBtn').disabled = !ag.checked; };
+      }
+    };
+  },
+  normFam(f) { const x = f.toUpperCase().replace(/[^A-Z0-9]/g, ''); return x.length === 12 ? x.slice(0, 4) + '-' + x.slice(4, 8) + '-' + x.slice(8) : null; },
+  async linkFamily(f, msgEl) {
+    const code = Views.normFam(f);
+    if (!code) { if (msgEl) { msgEl.textContent = 'الرمز يتكوّن من 12 حرفاً ورقماً. تأكد منه.'; msgEl.style.color = 'var(--bad)'; } return false; }
+    if (Dev.get().fam === code) return true;
+    Dev.set('fam', code);
+    if (Sync.has()) {
+      try { const r = await Sync.fetchOnce(code); if (r && r.coach) Coach.replace(mergeCoach(r.coach, emptyCoach())); if (r && r.kid) Kid.mergeIn(r.kid); } catch (e) { }
+      Sync.start();
+    }
+    return true;
+  },
+  linkDialog() {
+    const m = modal('<h2>رمز الربط</h2><p class="muted">اكتب الرمز الذي أعطاك إياه أخوك ليتابع تقدّمك من جهازه.</p><input class="inp mono" id="fam2" dir="ltr" placeholder="XXXX-XXXX-XXXX" value="' + esc(Dev.get().fam || '') + '"><p id="fm2" class="muted"></p><div class="row"><button class="btn" id="fsv">حفظ</button><button class="btn sec" data-close>إلغاء</button></div>');
+    $('#fsv', m.el).onclick = async () => { const ok = await Views.linkFamily($('#fam2', m.el).value, $('#fm2', m.el)); if (ok) { m.close(); toast('تم الربط ✅'); App.render(); } };
+  },
+
+  map(r, D) {
+    const k = Kid.get(); const ri = App.rankInfo(D.xp); const night = document.documentElement.dataset.stage === '2';
+    const curU = C.units.find(u => D.st[u.id].open && !D.st[u.id].passed);
+    const greet = k.name ? 'يا ' + esc(k.name) : 'يا بطل';
+    let h = '<div class="hero">' + Art.eagle('happy', ri.i, night) + '<div class="bubble">' + (curU ? 'أهلاً ' + greet + '! نكمل اليوم في <b>' + esc(curU.title) + '</b>.' : D.stage2 ? 'أهلاً ' + greet + '! الأعلام تنتظرك في تبويب «الأعلام».' : 'أهلاً ' + greet + '!') + '<div class="bar" style="margin-top:8px"><i style="width:' + ri.pct + '%"></i></div><small class="muted">' + esc(ri.cur.n) + (ri.next ? ' ← ' + esc(ri.next.n) + ' (باقي <bdi>' + (ri.next.x - D.xp) + ' XP</bdi>)' : '') + '</small></div></div>';
+    h += '<div class="stage-h">المرحلة الأولى: الأساسيات</div><div class="path">';
+    C.units.forEach((u, i) => {
+      const s = D.st[u.id];
+      const cls = !s.open ? 'locked' : s.passed ? 'done' : (u === curU ? 'cur' : '');
+      const pct = Math.round((s.ld / s.total) * 100);
+      h += '<a class="unit ' + cls + '" href="' + (s.open ? '#/unit/' + u.id : 'javascript:void 0') + '" data-locked="' + (!s.open ? 1 : 0) + '"><div class="ic">' + u.icon + '</div><div class="tx"><small>الوحدة ' + (i + 1) + '</small><b>' + esc(u.title) + '</b>' +
+        (s.open ? '<div class="bar"><i style="width:' + (s.passed ? 100 : pct) + '%"></i></div><small>' + (s.passed ? '✅ أتقنتها (' + s.best + '%)' : s.ld + ' من ' + s.total + ' دروس') + '</small>' : '<small>🔒 أتقن الوحدة السابقة لتفتحها</small>') + '</div></a>';
+    });
+    const f = D.st.final;
+    if (C.final) h += '<a class="unit ' + (!f.open ? 'locked' : f.passed ? 'done' : 'cur') + '" href="' + (f.open ? '#/unit/final' : 'javascript:void 0') + '"><div class="ic">⭐</div><div class="tx"><small>مشروع نهاية المرحلة</small><b>' + esc(C.final.title) + '</b>' + (f.open ? '<small>' + (f.passed ? '✅ أنجزته' : f.ld + ' من ' + f.total + ' مهام') + '</small>' : '<small>🔒 بعد إتقان كل الوحدات</small>') + '</div></a>';
+    h += '</div>';
+    h += '<div class="stage-h">المرحلة الثانية: صيد الأعلام</div>';
+    h += D.stage2 ? '<a class="unit cur" href="#/ctf"><div class="ic">🚩</div><div class="tx"><b>تحديات الأعلام (CTF)</b><small>' + D.solved.length + ' من ' + C.ctf.length + ' أعلام</small></div></a>' : '<div class="unit locked"><div class="ic">🚩</div><div class="tx"><b>تحديات الأعلام (CTF)</b><small>🔒 تُفتح بعد مشروع المرحلة الأولى</small></div></div>';
+    return { html: h, mount() { $$('[data-locked="1"]').forEach(a => a.onclick = e => { e.preventDefault(); Snd.bad(); toast('🔒 أتقن الوحدة السابقة أولاً (80% في اختبارها)'); }); } };
+  },
+
+  unit(r, D) {
+    const u = unitById(r[1]); if (!u) return Views.map(r, D);
+    const s = D.st[u.id]; if (!s || !s.open) { setTimeout(() => App.go('map')); return {}; }
+    const k = Kid.get();
+    let h = '<div class="row" style="margin:6px 0"><a class="btn sm sec" href="#/map">' + ic('back', 18) + 'الرحلة</a></div>';
+    h += '<div class="card" style="display:flex;gap:12px;align-items:center"><div style="font-size:48px">' + u.icon + '</div><div><h1 style="margin:0">' + esc(u.title) + '</h1><p class="muted" style="margin:0">' + md(u.blurb || '') + '</p></div></div>';
+    let prevDone = true;
+    u.lessons.forEach((l, i) => {
+      const key = u.id + '.' + l.id, L = k.L[key]; const done = !!(L && L.d);
+      const open = prevDone || (s.ov === 'open');
+      h += '<a class="unit ' + (done ? 'done' : open ? 'cur' : 'locked') + '" href="' + (open ? '#/lesson/' + u.id + '/' + l.id : 'javascript:void 0') + '"><div class="ic" style="font-size:22px;font-weight:800">' + (done ? '✅' : (i + 1)) + '</div><div class="tx"><b>' + esc(l.title) + '</b><small>' + (done ? 'أنهيته · يمكنك إعادته' : open ? (l.mins || 10) + ' دقائق تقريباً' : '🔒 أنهِ الدرس السابق') + '</small></div></a>';
+      prevDone = done;
+    });
+    if (u.id !== 'final') {
+      const allDone = s.ld === s.total;
+      h += '<div class="card" style="text-align:center"><h2>🏅 اختبار الإتقان</h2><p>' + (s.passed ? 'أتقنت هذه الوحدة! أفضل نتيجة: <b>' + s.best + '%</b>' : 'تحتاج <b>80%</b> لتفتح الوحدة التالية.' + (s.best ? ' أفضل نتيجة حتى الآن: ' + s.best + '%' : '')) + '</p>' +
+        (allDone || s.ov === 'open' ? '<a class="btn ' + (s.passed ? 'sec' : 'gold') + '" href="#/test/' + u.id + '">' + (s.passed ? 'أعد الاختبار' : 'ابدأ الاختبار') + '</a>' : '<p class="muted">🔒 أنهِ كل الدروس أولاً</p>') + '</div>';
+    }
+    return { html: h };
+  },
+
+  lesson(r, D) {
+    const u = unitById(r[1]); const l = u && u.lessons.find(x => x.id === r[2]);
+    if (!u || !l || !D.st[u.id] || !D.st[u.id].open) { setTimeout(() => App.go('map')); return {}; }
+    return Lesson.start(u, l, D);
+  },
+  test(r, D) { const u = unitById(r[1]); if (!u || !D.st[u.id] || !D.st[u.id].open) { setTimeout(() => App.go('map')); return {}; } return Test.start(u, D); },
+
+  today(r, D) {
+    const k = Kid.get(); const tk = {}; const dd = k.D[dayKey()] || {}; for (const dv in dd) Object.assign(tk, dd[dv].k || {});
+    const due = Review.due().length;
+    const nextL = Views.nextLesson(D);
+    let h = '<h1>مهام اليوم</h1><p class="muted">10–15 دقيقة كل يوم تكفي. أنجز مهمتين على الأقل ليُحسب اليوم في سلسلتك 🔥</p>';
+    const tasks = [
+      ['typing', '⚡', 'إحماء الأصابع', 'لعبة كتابة سريعة (دقيقة واحدة)', '#/typing'],
+      ['lesson', '📘', nextL ? 'درس اليوم' : (D.stage2 ? 'علم اليوم' : 'درس اليوم'), nextL ? nextL.title : (D.stage2 ? 'التقط علماً جديداً' : 'أكمل اختبار الوحدة'), nextL ? nextL.href : (D.stage2 ? '#/ctf' : '#/map')],
+      ['review', '🧠', 'المراجعة', due ? cnt(due, ['سؤال واحد ينتظرك', 'سؤالان ينتظرانك', 'أسئلة تنتظرك', 'سؤالاً ينتظرك']) : 'تحدٍّ سريع من دروسك السابقة', '#/review']
+    ];
+    tasks.forEach(t => { h += '<a class="task ' + (tk[t[0]] ? 'done' : '') + '" href="' + t[4] + '"><div class="ck">' + (tk[t[0]] ? '✓' : t[1]) + '</div><div style="flex:1"><b>' + t[2] + '</b><br><small class="muted">' + esc(t[3]) + '</small></div>' + ic('back', 20) + '</a>'; });
+    // streak days
+    h += '<div class="card"><h3 style="text-align:center;margin-top:0">🔥 سلسلتك: ' + cnt(D.streak, F_DAY) + '</h3><div class="streak">';
+    for (let i = 13; i >= 0; i--) { const dk = addDays(dayKey(), -i); h += '<span class="' + (D.active[dk] ? 'on' : '') + '" title="' + fmtDay(dk) + '">' + dk.slice(8) + '</span>'; }
+    h += '</div></div>';
+    const c = Coach.get();
+    if (c.wk && c.wk.title) {
+      const w = k.W[c.wk.id];
+      h += '<div class="card" style="border-color:var(--gold)"><h3 style="margin-top:0">🏆 تحدّي الأسبوع من أخيك</h3><b>' + esc(c.wk.title) + '</b><p style="white-space:pre-wrap">' + esc(c.wk.body || '') + '</p>' + (w ? '<p class="pill ok">✅ أرسلت إجابتك</p>' : '<a class="btn gold" href="#/weekly">حلّ التحدي</a>') + '</div>';
+    }
+    const msgs = Object.entries(c.msgs || {}).sort((a, b) => b[1].t - a[1].t).slice(0, 5);
+    if (msgs.length) h += '<div class="sec-h"><h2>رسائل أخيك</h2></div>' + msgs.map(([id, m]) => '<div class="card" style="padding:10px 14px"><small class="muted">' + fmtDay(dayKey(m.t)) + '</small><p style="margin:0;white-space:pre-wrap">' + esc(m.x) + '</p></div>').join('');
+    return { html: h };
+  },
+  nextLesson(D) {
+    const k = Kid.get();
+    for (const u of C.units.concat(C.final ? [C.final] : [])) {
+      const s = D.st[u.id]; if (!s || !s.open) continue;
+      for (const l of u.lessons) if (!(k.L[u.id + '.' + l.id] && k.L[u.id + '.' + l.id].d)) return { title: l.title, href: '#/lesson/' + u.id + '/' + l.id };
+      if (u.id !== 'final' && !s.passed) return { title: 'اختبار إتقان: ' + u.title, href: '#/test/' + u.id };
+    }
+    return null;
+  },
+  weekly() {
+    const c = Coach.get(); if (!c.wk) { setTimeout(() => App.go('today')); return {}; }
+    const w = Kid.get().W[c.wk.id];
+    return {
+      html: '<div class="row" style="margin:6px 0"><a class="btn sm sec" href="#/today">' + ic('back', 18) + 'اليوم</a></div><div class="card"><h1>🏆 ' + esc(c.wk.title) + '</h1><p style="white-space:pre-wrap">' + esc(c.wk.body || '') + '</p><label><b>إجابتك أو ما فعلته:</b></label><textarea class="inp" id="wa" rows="5">' + esc(w ? w.ans : '') + '</textarea><button class="btn gold wide" id="ws" style="margin-top:10px">أرسل لأخي</button></div>',
+      mount() { $('#ws').onclick = () => { const a = $('#wa').value.trim(); if (!a) { toast('اكتب إجابتك أولاً'); return; } const first = !w; Kid.weekly(c.wk.id, a); if (first) { Snd.win(); confetti(); xpFly(50, $('#ws')); } toast('وصلت إجابتك لأخيك ✅'); setTimeout(() => App.go('today'), 900); }; }
+    };
+  },
+
+  review() { return Review.start(); },
+  typing() { return Typing.start(); },
+
+  glossary() {
+    const k = Kid.get(); const ids = Object.keys(C.terms).filter(id => k.G[id]).sort((a, b) => C.terms[a].ar.localeCompare(C.terms[b].ar, 'ar'));
+    let h = '<h1>📖 قاموسي</h1><p class="muted">كل كلمة تقابلها في الدروس تُضاف هنا تلقائياً. عندك الآن <b>' + ids.length + '</b> من ' + Object.keys(C.terms).length + ' كلمة.</p><input class="inp" id="gq" placeholder="ابحث عن كلمة...">';
+    h += '<div id="gl">' + (ids.length ? ids.map(id => { const t = C.terms[id]; return '<div class="gl-item" data-s="' + esc((t.ar + ' ' + (t.en || '')).toLowerCase()) + '"><b>' + esc(t.ar) + '</b> ' + (t.en ? '<span class="en">' + esc(t.en) + '</span>' : '') + '<div>' + md(t.d) + '</div></div>'; }).join('') : '<div class="card" style="text-align:center">القاموس فارغ الآن. ابدأ أول درس وستمتلئ هذه الصفحة بالكلمات!</div>') + '</div>';
+    return { html: h, mount() { const q = $('#gq'); if (q) q.oninput = () => { const v = q.value.trim().toLowerCase(); $$('.gl-item').forEach(e => e.style.display = !v || e.dataset.s.includes(v) ? '' : 'none'); }; } };
+  },
+
+  me(r, D) {
+    const k = Kid.get(); const ri = App.rankInfo(D.xp); const d = Dev.get();
+    let h = '<div class="card hatbox">' + Art.hat(ri.i) + '<h1 style="margin:0">' + esc(k.name || 'البطل') + '</h1><p style="margin:0"><b>' + esc(ri.cur.n) + '</b> · <bdi>' + D.xp + ' XP</bdi></p><div class="bar" style="width:100%;max-width:340px"><i style="width:' + ri.pct + '%"></i></div><small class="muted">' + (ri.next ? 'باقي <bdi>' + (ri.next.x - D.xp) + ' XP</bdi> على «' + esc(ri.next.n) + '»' : 'وصلت لأعلى رتبة!') + '</small></div>';
+    h += '<div class="sec-h"><h2>الرتب</h2></div><div class="ranks">' + RANKS.map((x, i) => '<div class="rk ' + (i === ri.i ? 'cur' : i > ri.i ? 'no' : '') + '">' + (i <= ri.i ? '🎩' : '🔒') + ' ' + esc(x.n) + '<span class="sp" style="flex:1"></span><small>' + x.x + ' XP</small></div>').join('') + '</div>';
+    h += '<div class="sec-h"><h2>الميداليات</h2><small class="muted">' + Object.keys(k.M).filter(m => MEDALS[m]).length + ' من ' + Object.keys(MEDALS).length + '</small></div>';
+    for (const dm in DOMAINS) {
+      const ms = Object.keys(MEDALS).filter(m => MEDALS[m].d === dm); if (!ms.length) continue;
+      h += '<h3 style="color:' + DOMAINS[dm][1] + '">' + DOMAINS[dm][0] + '</h3><div class="medals">' + ms.map(m => '<div class="medal ' + (k.M[m] ? '' : 'no') + '">' + Art.medal(MEDALS[m].ic, DOMAINS[dm][1], !!k.M[m]) + '<b>' + esc(MEDALS[m].n) + '</b><small>' + esc(MEDALS[m].how) + '</small></div>').join('') + '</div>';
+    }
+    h += '<div class="sec-h"><h2>الشهادات</h2></div><div class="card">' +
+      (k.X.final ? '<button class="btn gold" data-act="cert" data-v="1">' + ic('dl', 20) + 'شهادة المرحلة الأولى (PDF)</button>' : '<p class="muted">🔒 شهادة المرحلة الأولى: بعد مشروع نهاية المرحلة.</p>') +
+      (D.solved.length >= C.ctf.length && C.ctf.length ? ' <button class="btn gold" data-act="cert" data-v="2">' + ic('dl', 20) + 'شهادة المرحلة الثانية (PDF)</button>' : '<p class="muted">🔒 شهادة المرحلة الثانية: بعد التقاط كل الأعلام.</p>') + '</div>';
+    h += '<div class="sec-h"><h2>الإعدادات</h2></div><div class="card"><div class="row"><button class="btn sec" data-act="sound">' + ic(d.sound ? 'sound' : 'mute', 20) + (d.sound ? 'الصوت يعمل' : 'الصوت مكتوم') + '</button><button class="btn sec" data-act="big">' + (d.big ? 'خط عادي' : 'خط كبير') + '</button><button class="btn sec" data-act="link">🔗 ' + (d.fam ? 'رمز الربط: <span class="mono">' + esc(d.fam) + '</span>' : 'إضافة رمز الربط') + '</button></div><p class="muted" style="font-size:.85em;margin-top:10px">رقم هذا الجهاز: <span class="mono">' + esc(d.id) + '</span></p></div>';
+    return { html: h };
+  },
+
+  ctf(r, D) { return CTF.hub(D); },
+  ctfc(r, D) { return CTF.challenge(r[1], D); },
+  next() { return CTF.next(); }
+};
+
+/* ---------- Lesson player ---------- */
+const Lesson = {
+  start(u, l, D) {
+    const key = u.id + '.' + l.id;
+    Kid.lessonStart(key);
+    App.lessonKey = key; App.celeOK = false;
+    const L = { u, l, key, i: 0, ok: false, steps: l.steps, xpBefore: D.xp, rank: D.rank };
+    Lesson.cur = L;
+    return { html: '<div id="lesson"></div>', mount() { Lesson.paint(); } };
+  },
+  paint() {
+    const L = Lesson.cur; const s = L.steps[L.i]; const total = L.steps.length;
+    const night = document.documentElement.dataset.stage === '2';
+    L.ok = !Lesson.blocking(s); L.simpleShown = false;
+    let h = '<div class="lhead"><button class="x" data-l="exit" aria-label="خروج">' + ic('x', 22) + '</button><div class="bar"><i style="width:' + Math.round(L.i / total * 100) + '%"></i></div><small class="muted">' + (L.i + 1) + '/' + total + '</small></div>';
+    if (L.i === 0) h += '<h2 style="margin:0 0 6px">' + esc(L.l.title) + '</h2>';
+    const mood = s.mood || (s.t === 'say' ? 'idle' : 'think');
+    const text = s.m || s.q || '';
+    if (text) h += '<div class="mentor">' + Art.eagle(mood, L.rank, night) + '<div class="bubble">' + md(text) + '<div id="simple"></div></div></div>';
+    h += '<div id="stage"></div><div id="fb"></div>';
+    h += '<div class="lfoot">' + (s.s ? '<button class="btn sec" data-l="simple">' + ic('bulb', 20) + 'اشرح لي بطريقة أبسط</button>' : '') + '<button class="btn" data-l="next" id="nextBtn"' + (L.ok ? '' : ' disabled') + '>' + (L.i === total - 1 ? 'أنهيت الدرس!' : 'التالي') + '</button></div>';
+    const root = $('#lesson'); root.innerHTML = h;
+    const stage = $('#stage');
+    const api = Lesson.api(s, L);
+    try { Steps.render(s, stage, api, L); } catch (e) { stage.innerHTML = '<div class="feedback bad">حدث خطأ في هذا الجزء. اضغط التالي.</div>'; api.done(); }
+    root.onclick = e => {
+      const b = e.target.closest('[data-l]'); if (!b) return;
+      const a = b.dataset.l;
+      if (a === 'exit') { if (L.i === 0 || confirm('تخرج من الدرس؟ ستبدأه من جديد لاحقاً.')) App.go('unit/' + L.u.id); }
+      if (a === 'simple') { Snd.click(); if (!L.simpleShown) { L.simpleShown = true; Kid.lessonHint(L.key); } $('#simple').innerHTML = '<div class="simpler">' + md(s.s) + '</div>'; }
+      if (a === 'next') { if (!L.ok) return; Snd.click(); if (L.i < total - 1) { L.i++; Lesson.paint(); window.scrollTo(0, 0); } else Lesson.finish(); }
+    };
+  },
+  blocking(s) { return ['q', 'in', 'sort', 'order', 'match', 'do', 'sh', 'py'].includes(s.t) || (s.t === 'say' && s.w && s.w.goal); },
+  api(s, L) {
+    const qid = L.key + '.' + L.i;
+    return {
+      done(msg) { L.ok = true; const b = $('#nextBtn'); if (b) { b.disabled = false; b.focus({ preventScroll: true }); } if (msg) Lesson.fb(true, msg); },
+      wrong(tag) { Kid.lessonWrong(L.key, tag || s.tag); },
+      fb: Lesson.fb, qid,
+      card(ok) { Kid.addCard(qid, ok); },
+      medal(id) { if (Kid.medal(id)) toast('🏅 ربحت ميدالية: ' + MEDALS[id].n); },
+      hint() { Kid.lessonHint(L.key); }
+    };
+  },
+  fb(ok, msg, why) {
+    const f = $('#fb'); if (!f) return;
+    f.innerHTML = '<div class="feedback ' + (ok ? 'ok' : 'bad') + '">' + (ok ? '✅ ' : '❌ ') + md(msg) + (why ? '<div class="why">' + md(why) + '</div>' : '') + '</div>';
+    if (ok) Snd.ok(); else Snd.bad();
+    f.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  },
+  finish() {
+    const L = Lesson.cur; const first = Kid.lessonDone(L.key, L.l.title);
+    if (L.l.medal) Kid.medal(L.l.medal);
+    if (L.u.id === 'final' && L.u.lessons.every(x => Kid.get().L['final.' + x.id] && Kid.get().L['final.' + x.id].d)) { if (Kid.flag('final')) Kid.medal('stage1'); }
+    const D = App.derive(); const gain = D.xp - L.xpBefore;
+    const idx = L.u.lessons.indexOf(L.l); const nx = L.u.lessons[idx + 1];
+    const night = document.documentElement.dataset.stage === '2';
+    App.lessonKey = null; App.celeOK = true;
+    $('#lesson').innerHTML = '<div style="text-align:center;padding-top:30px">' + Art.eagle('happy', D.rank, night).replace('class="eagle"', 'class="eagle" style="width:150px"') + '<h1>أحسنت!</h1><p>أنهيت درس «' + esc(L.l.title) + '»</p>' + (gain > 0 ? '<p class="big-num"><bdi>+' + gain + ' XP</bdi></p>' : '<p class="muted">راجعت الدرس مرة أخرى. ممتاز!</p>') +
+      '<div class="row" style="justify-content:center">' + (nx ? '<a class="btn" href="#/lesson/' + L.u.id + '/' + nx.id + '">الدرس التالي</a>' : (L.u.id !== 'final' ? '<a class="btn gold" href="#/test/' + L.u.id + '">اختبار الإتقان</a>' : '<a class="btn gold" href="#/map">الرحلة</a>')) + '<a class="btn sec" href="#/unit/' + L.u.id + '">قائمة الدروس</a></div></div>';
+    if (first) { Snd.win(); confetti(70); }
+    setTimeout(App.checkCele, 900);
+  }
+};
+
+/* ---------- step renderers ---------- */
+const norm = s => String(s || '').trim().toLowerCase().replace(/[ً-ْ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, ' ');
+const Steps = {
+  render(s, el, api, L) {
+    const f = Steps[s.t]; if (f) f(s, el, api, L); else api.done();
+  },
+  say(s, el, api) { if (s.w) { const w = document.createElement('div'); el.appendChild(w); Widgets.mount(s.w, w, api); if (!s.w.goal) api.done(); } else api.done(); if (s.img) el.insertAdjacentHTML('afterbegin', '<div style="text-align:center;font-size:64px;line-height:1.2">' + s.img + '</div>'); },
+  q(s, el, api, L) {
+    const order = s.keep ? s.o.map((x, i) => i) : shuffle(s.o.map((x, i) => i));
+    let firstTry = true, solved = false;
+    el.innerHTML = (s.code ? '<pre class="hexv">' + esc(s.code) + '</pre>' : '') + '<div class="opts">' + order.map(i => '<button class="opt" data-i="' + i + '">' + md(s.o[i]) + '</button>').join('') + '</div>';
+    el.onclick = e => {
+      const b = e.target.closest('.opt'); if (!b || solved) return; const i = +b.dataset.i;
+      if (i === s.a) { solved = true; b.classList.add('right'); api.card(firstTry); api.fb(true, s.yes || pick(['صحيح!', 'ممتاز!', 'أحسنت!', 'بالضبط!']), s.why); api.done(); }
+      else { firstTry = false; b.classList.add('wrong'); b.disabled = true; api.wrong(); api.fb(false, (s.no && s.no[i]) || 'ليس هذا. حاول مرة أخرى!', s.hint); }
+    };
+  },
+  in(s, el, api) {
+    let firstTry = true;
+    el.innerHTML = (s.code ? '<pre class="hexv">' + esc(s.code) + '</pre>' : '') + '<form class="row" style="flex-wrap:nowrap"><input class="inp' + (s.ltr ? ' mono' : '') + '" ' + (s.ltr ? 'dir="ltr"' : '') + ' autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="' + esc(s.ph || 'اكتب إجابتك') + '"><button class="btn">تحقّق</button></form>';
+    const inp = $('input', el); setTimeout(() => inp.focus({ preventScroll: true }), 50);
+    $('form', el).onsubmit = e => {
+      e.preventDefault(); const v = norm(inp.value); if (!v) return;
+      const ok = [].concat(s.a).some(a => norm(a) === v || (s.loose && v.includes(norm(a))));
+      if (ok) { inp.disabled = true; api.card(firstTry); api.fb(true, s.yes || 'صحيح!', s.why); api.done(); }
+      else { firstTry = false; api.wrong(); api.fb(false, 'ليس بعد. حاول مرة أخرى!', s.hint); }
+    };
+  },
+  sort(s, el, api) {
+    const items = shuffle(s.items.map((x, i) => i)); let sel = null; const placed = {};
+    const draw = () => {
+      el.innerHTML = '<p class="muted" style="font-size:.9em">اضغط على البطاقة، ثم على الصندوق المناسب.</p><div class="tagbox">' + items.filter(i => !(i in placed)).map(i => '<button class="tag' + (sel === i ? ' sel' : '') + '" data-i="' + i + '">' + md(s.items[i][0]) + '</button>').join('') + '</div><div class="buckets">' + s.buckets.map((b, bi) => '<div class="bucket" data-b="' + bi + '"><h4>' + md(b) + '</h4>' + items.filter(i => placed[i] === bi).map(i => '<span class="tag right" style="display:inline-block;margin:3px">' + md(s.items[i][0]) + '</span>').join('') + '</div>').join('') + '</div>';
+    };
+    draw();
+    el.onclick = e => {
+      const t = e.target.closest('.tag[data-i]'); if (t) { sel = +t.dataset.i; Snd.click(); draw(); return; }
+      const b = e.target.closest('.bucket'); if (!b || sel === null) return; const bi = +b.dataset.b;
+      if (s.items[sel][1] === bi) { placed[sel] = bi; Snd.ok(); sel = null; draw(); if (Object.keys(placed).length === s.items.length) { api.card(true); api.fb(true, s.yes || 'رتّبتها كلها صحيحاً!', s.why); api.done(); } }
+      else { api.wrong(); const why = s.items[sel][2]; api.fb(false, 'ليس هذا الصندوق. فكّر مرة أخرى!', why); const tg = $('.tag[data-i="' + sel + '"]', el); if (tg) tg.classList.add('wrong'); }
+    };
+  },
+  order(s, el, api) {
+    let cur = shuffle(s.items.map((x, i) => i)); if (cur.every((x, i) => x === i)) cur.reverse();
+    const draw = () => { el.innerHTML = '<p class="muted" style="font-size:.9em">رتّب الخطوات بالأسهم، ثم اضغط «تحقّق».</p><div class="order-list">' + cur.map((i, p) => '<div class="order-item"><span class="n">' + (p + 1) + '</span><span>' + md(s.items[i]) + '</span><span class="mv"><button data-m="' + p + '" data-d="-1" aria-label="أعلى">' + ic('up', 18) + '</button><button data-m="' + p + '" data-d="1" aria-label="أسفل">' + ic('down', 18) + '</button></span></div>').join('') + '</div><button class="btn" data-ck>تحقّق</button>'; };
+    draw();
+    el.onclick = e => {
+      const m = e.target.closest('[data-m]'); if (m) { const p = +m.dataset.m, d = +m.dataset.d, q = p + d; if (q < 0 || q >= cur.length) return;[cur[p], cur[q]] = [cur[q], cur[p]]; Snd.click(); draw(); return; }
+      if (e.target.closest('[data-ck]')) { if (cur.every((x, i) => x === i)) { api.card(true); api.fb(true, s.yes || 'الترتيب صحيح!', s.why); api.done(); $$('[data-m],[data-ck]', el).forEach(b => b.disabled = true); } else { api.wrong(); const good = cur.filter((x, i) => x === i).length; api.fb(false, 'ليس بعد. ' + good + ' في مكانها الصحيح.', s.hint); } }
+    };
+  },
+  match(s, el, api) {
+    const L = shuffle(s.pairs.map((x, i) => i)), R = shuffle(s.pairs.map((x, i) => i)); let sel = null; const done = {};
+    const draw = () => { el.innerHTML = '<p class="muted" style="font-size:.9em">اضغط على عنصر من اليمين، ثم على ما يناسبه من اليسار.</p><div class="match"><div class="col">' + L.map(i => '<button class="tag' + (done[i] ? ' right' : sel === i ? ' sel' : '') + '" data-l="' + i + '"' + (done[i] ? ' disabled' : '') + '>' + md(s.pairs[i][0]) + '</button>').join('') + '</div><div class="col">' + R.map(i => '<button class="tag' + (done[i] ? ' right' : '') + '" data-r="' + i + '"' + (done[i] ? ' disabled' : '') + '>' + md(s.pairs[i][1]) + '</button>').join('') + '</div></div>'; };
+    draw();
+    el.onclick = e => {
+      const l = e.target.closest('[data-l]'); if (l) { sel = +l.dataset.l; Snd.click(); draw(); return; }
+      const r = e.target.closest('[data-r]'); if (!r || sel === null) return; const ri = +r.dataset.r;
+      if (ri === sel) { done[sel] = 1; sel = null; Snd.ok(); draw(); if (Object.keys(done).length === s.pairs.length) { api.card(true); api.fb(true, s.yes || 'وصّلتها كلها!', s.why); api.done(); } }
+      else { api.wrong(); r.classList.add('wrong'); Snd.bad(); setTimeout(() => r.classList.remove('wrong'), 400); }
+    };
+  },
+  do(s, el, api) { Widgets.mount(s.w, el, api); },
+  sh(s, el, api) { Term.mission(s, el, api); },
+  py(s, el, api) { Py.exercise(s, el, api); }
+};
+const pick = a => a[Math.floor(Math.random() * a.length)];
+
+/* ---------- Mastery test ---------- */
+const Test = {
+  start(u, D) {
+    const pool = (u.test || []).map((s, i) => ({ s, qid: u.id + '.t.' + i }));
+    const qs = shuffle(pool).slice(0, Math.min(10, pool.length));
+    Test.cur = { u, qs, i: 0, right: 0, wrong: [], xpBefore: D.xp, answered: false };
+    App.celeOK = false;
+    return { html: '<div id="test"></div>', mount() { Test.paint(); } };
+  },
+  paint() {
+    const T = Test.cur; const { s, qid } = T.qs[T.i]; T.answered = false;
+    let h = '<div class="lhead"><button class="x" data-t="exit" aria-label="خروج">' + ic('x', 22) + '</button><div class="bar"><i style="width:' + Math.round(T.i / T.qs.length * 100) + '%"></i></div><small class="muted">' + (T.i + 1) + '/' + T.qs.length + '</small></div>' +
+      '<p class="muted" style="margin:0">🏅 اختبار إتقان: ' + esc(T.u.title) + ' · محاولة واحدة لكل سؤال</p><h2>' + md(s.q || s.m) + '</h2>' + (s.code ? '<pre class="hexv">' + esc(s.code) + '</pre>' : '');
+    if (s.t === 'in') h += '<form class="row" style="flex-wrap:nowrap" id="tf"><input class="inp' + (s.ltr ? ' mono' : '') + '" ' + (s.ltr ? 'dir="ltr"' : '') + ' autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="اكتب إجابتك"><button class="btn">تأكيد</button></form>';
+    else h += '<div class="opts">' + shuffle(s.o.map((x, i) => i)).map(i => '<button class="opt" data-i="' + i + '">' + md(s.o[i]) + '</button>').join('') + '</div>';
+    h += '<div id="fb"></div><div class="lfoot"><button class="btn" id="tn" disabled>' + (T.i === T.qs.length - 1 ? 'النتيجة' : 'التالي') + '</button></div>';
+    const root = $('#test'); root.innerHTML = h;
+    const answer = (ok, el) => {
+      if (T.answered) return; T.answered = true;
+      if (ok) T.right++; else T.wrong.push(s.tag || '');
+      Kid.review(qid, ok);
+      Lesson.fb(ok, ok ? 'صحيح!' : 'خطأ. ' + (s.t === 'in' ? 'الإجابة: <span class="mono">' + esc([].concat(s.a)[0]) + '</span>' : 'الصحيح: ' + md(s.o[s.a])), s.why);
+      $('#tn').disabled = false;
+    };
+    root.onclick = e => {
+      const b = e.target.closest('.opt'); if (b && !T.answered) { const i = +b.dataset.i; b.classList.add(i === s.a ? 'right' : 'wrong'); if (i !== s.a) { const r = $('.opt[data-i="' + s.a + '"]', root); if (r) r.classList.add('right'); } answer(i === s.a); }
+      if (e.target.closest('[data-t="exit"]') && confirm('تخرج من الاختبار؟ لن تُحسب هذه المحاولة.')) App.go('unit/' + T.u.id);
+      if (e.target.id === 'tn' && T.answered) { if (T.i < T.qs.length - 1) { T.i++; Test.paint(); window.scrollTo(0, 0); } else Test.finish(); }
+    };
+    const f = $('#tf'); if (f) { const inp = $('input', f); setTimeout(() => inp.focus({ preventScroll: true }), 50); f.onsubmit = e => { e.preventDefault(); if (!inp.value.trim()) return; inp.disabled = true; const v = norm(inp.value); answer([].concat(s.a).some(a => norm(a) === v)); }; }
+  },
+  finish() {
+    const T = Test.cur; const sc = Math.round(T.right / T.qs.length * 100); const pass = sc >= 80;
+    const wasPassed = !!(Kid.get().T[T.u.id] && Kid.get().T[T.u.id].p);
+    Kid.testDone(T.u.id, sc, T.qs.length, T.wrong.filter(Boolean));
+    const D = App.derive(); const gain = D.xp - T.xpBefore;
+    App.celeOK = true;
+    const idx = C.units.indexOf(T.u); const nu = C.units[idx + 1];
+    const tags = uniq(T.wrong.filter(Boolean));
+    let h = '<div style="text-align:center;padding-top:24px">' + Art.eagle(pass ? 'happy' : 'think', D.rank).replace('class="eagle"', 'class="eagle" style="width:140px"') +
+      '<h1>' + (pass ? (wasPassed ? 'ممتاز مرة أخرى!' : 'أتقنت الوحدة!') : 'اقتربت!') + '</h1><p class="big-num">' + sc + '%</p><p>' + T.right + ' من ' + T.qs.length + ' إجابات صحيحة</p>' + (gain > 0 ? '<p><b style="color:var(--gold)"><bdi>+' + gain + ' XP</bdi></b></p>' : '');
+    if (pass) h += !wasPassed && nu ? '<p>فُتحت لك الوحدة التالية: <b>' + esc(nu.title) + '</b> 🔓</p><a class="btn gold" href="#/unit/' + nu.id + '">ادخلها الآن</a>' : '<a class="btn" href="#/map">الرحلة</a>';
+    else h += '<p>تحتاج 80% على الأقل. لا بأس! راجع هذه الأفكار ثم حاول مرة أخرى:</p>' + (tags.length ? '<div class="tagbox" style="justify-content:center">' + tags.map(t => '<span class="tag">' + esc(t) + '</span>').join('') + '</div>' : '') + '<div class="row" style="justify-content:center"><a class="btn" href="#/test/' + T.u.id + '">حاول مرة أخرى</a><a class="btn sec" href="#/unit/' + T.u.id + '">راجع الدروس</a></div>';
+    h += '</div>';
+    $('#test').innerHTML = h;
+    if (pass && !wasPassed) { Snd.fanfare(); confetti(120); } else if (pass) Snd.win();
+    setTimeout(App.checkCele, 1200);
+  }
+};
+
+/* ---------- Spaced review ---------- */
+const Review = {
+  due() { const k = Kid.get(), t = dayKey(); return Object.keys(k.R).filter(q => QIDX[q] && k.R[q].due <= t).sort((a, b) => k.R[a].due < k.R[b].due ? -1 : 1); },
+  start() {
+    let qs = Review.due().slice(0, 6), quick = false;
+    if (!qs.length) { quick = true; qs = shuffle(Object.keys(Kid.get().R).filter(q => QIDX[q])).slice(0, 3); }
+    if (!qs.length) return { html: '<div class="card" style="text-align:center;margin-top:30px">' + Art.eagle('happy', 0).replace('class="eagle"', 'class="eagle" style="width:110px"') + '<h2>لا أسئلة للمراجعة بعد</h2><p>ابدأ أول درس، وستعود إليك أسئلته هنا بعد أيام لتثبّتها في ذاكرتك.</p><a class="btn" href="#/map">الرحلة</a></div>' };
+    Review.cur = { qs, i: 0, right: 0, quick };
+    App.celeOK = false;
+    return { html: '<div id="rev"></div>', mount() { Review.paint(); } };
+  },
+  paint() {
+    const R = Review.cur; const qid = R.qs[R.i]; const { s } = QIDX[qid];
+    const root = $('#rev'); let answered = false;
+    root.innerHTML = '<div class="lhead"><button class="x" data-r="exit" aria-label="خروج">' + ic('x', 22) + '</button><div class="bar"><i style="width:' + Math.round(R.i / R.qs.length * 100) + '%"></i></div><small class="muted">' + (R.i + 1) + '/' + R.qs.length + '</small></div><p class="muted" style="margin:0">🧠 ' + (R.quick ? 'تحدٍّ سريع' : 'مراجعة: هل تتذكّر؟') + '</p><h2>' + md(s.q || s.m) + '</h2>' + (s.code ? '<pre class="hexv">' + esc(s.code) + '</pre>' : '') +
+      (s.t === 'in' ? '<form class="row" style="flex-wrap:nowrap" id="rf"><input class="inp' + (s.ltr ? ' mono' : '') + '" ' + (s.ltr ? 'dir="ltr"' : '') + ' autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn">تأكيد</button></form>' : '<div class="opts">' + shuffle(s.o.map((x, i) => i)).map(i => '<button class="opt" data-i="' + i + '">' + md(s.o[i]) + '</button>').join('') + '</div>') +
+      '<div id="fb"></div><div class="lfoot"><button class="btn" id="rn" disabled>' + (R.i === R.qs.length - 1 ? 'إنهاء' : 'التالي') + '</button></div>';
+    const answer = ok => { if (answered) return; answered = true; if (ok) R.right++; if (!R.quick) Kid.review(qid, ok); Lesson.fb(ok, ok ? 'تتذكّرها! ممتاز' : 'لا بأس، ستعود إليك غداً. ' + (s.t === 'in' ? 'الإجابة: <span class="mono">' + esc([].concat(s.a)[0]) + '</span>' : 'الصحيح: ' + md(s.o[s.a])), s.why); $('#rn').disabled = false; };
+    root.onclick = e => {
+      const b = e.target.closest('.opt'); if (b && !answered) { const i = +b.dataset.i; b.classList.add(i === s.a ? 'right' : 'wrong'); answer(i === s.a); }
+      if (e.target.closest('[data-r="exit"]')) App.go('today');
+      if (e.target.id === 'rn' && answered) { if (R.i < R.qs.length - 1) { R.i++; Review.paint(); } else Review.finish(); }
+    };
+    const f = $('#rf'); if (f) { const inp = $('input', f); inp.focus({ preventScroll: true }); f.onsubmit = e => { e.preventDefault(); if (!inp.value.trim()) return; inp.disabled = true; const v = norm(inp.value); answer([].concat(s.a).some(a => norm(a) === v)); }; }
+  },
+  finish() {
+    const R = Review.cur; const first = Kid.task('review'); Kid.save();
+    App.celeOK = true;
+    $('#rev').innerHTML = '<div style="text-align:center;padding-top:30px">' + Art.eagle('happy', App.derive().rank).replace('class="eagle"', 'class="eagle" style="width:130px"') + '<h1>انتهت المراجعة!</h1><p class="big-num">' + R.right + ' / ' + R.qs.length + '</p><p>كل سؤال تتذكّره يبتعد موعده أكثر، وكل سؤال تنساه يعود غداً.</p><a class="btn" href="#/today">مهام اليوم</a></div>';
+    if (first) { Snd.win(); confetti(50); }
+    setTimeout(App.checkCele, 900);
+  }
+};
+
+/* ---------- Typing warm-up ---------- */
+const Typing = {
+  WORDS: ['ls', 'cd', 'pwd', 'cat', 'echo', 'print', 'python', 'hello', 'data', 'port', 'ip', 'dns', 'web', 'hash', 'key', 'flag', 'code', 'loop', 'if', 'else', 'for', 'def', 'list', 'file', 'mkdir', 'grep', 'http', 'login', 'admin', 'cyber', 'byte', 'bit', 'cpu', 'ram', 'disk', 'server', 'client', 'oqab', 'shield', 'secret', 'cipher', 'linux', 'html', 'link', 'safe'],
+  start() {
+    const k = Kid.get(); const lvl = Object.keys(k.L).filter(x => k.L[x].d).length;
+    let words = Typing.WORDS.slice(0, lvl < 10 ? 20 : lvl < 25 ? 34 : Typing.WORDS.length);
+    if (lvl >= 20) words = words.concat(['ls -a', 'cd ..', 'print(x)', 'x = 5', 'cat log.txt']);
+    const T = { words: shuffle(words), i: 0, typed: 0, start: 0, left: 60, timer: 0, ok: 0, errs: 0 };
+    Typing.cur = T;
+    return {
+      html: '<div class="lhead"><button class="x" data-y="exit" aria-label="خروج">' + ic('x', 22) + '</button><div class="bar"><i id="tyb" style="width:100%"></i></div><small class="muted" id="tyt">60</small></div><div class="mentor">' + Art.eagle('idle', 0) + '<div class="bubble">إحماء الأصابع! اكتب الكلمة الظاهرة ثم اضغط مسافة أو Enter. لديك <b>دقيقة واحدة</b>. هذه الكلمات ستحتاجها في الطرفية والبرمجة.</div></div>' +
+        '<div class="wbox typing"><div class="target" id="tw"></div><input class="inp mono" id="ti" dir="ltr" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ابدأ الكتابة هنا" style="margin-top:10px;text-align:center"><div class="row" style="justify-content:space-around;margin-top:10px"><div><b id="tok">0</b> كلمة صحيحة</div><div><b id="terr">0</b> خطأ</div></div></div><div id="tyres"></div>',
+      mount() {
+        const inp = $('#ti'); inp.focus();
+        const show = () => { const w = T.words[T.i % T.words.length]; const v = inp.value; let h = ''; for (let j = 0; j < w.length; j++) h += '<span class="' + (j < v.length ? (v[j] === w[j] ? 'd' : '') : j === v.length ? 'c' : '') + '">' + esc(w[j] === ' ' ? ' ' : w[j]) + '</span>'; $('#tw').innerHTML = h + ' <span class="muted" style="font-size:.7em">' + esc(T.words[(T.i + 1) % T.words.length]) + '</span>'; };
+        show();
+        $('[data-y="exit"]').onclick = () => { clearInterval(T.timer); App.go('today'); };
+        inp.addEventListener('input', () => {
+          if (!T.start) { T.start = now(); T.timer = setInterval(() => { T.left--; const tt = $('#tyt'), tb = $('#tyb'); if (tt) tt.textContent = T.left; if (tb) tb.style.width = (T.left / 60 * 100) + '%'; if (T.left <= 0) Typing.end(); }, 1000); }
+          Snd.key();
+          const w = T.words[T.i % T.words.length];
+          const v = inp.value;
+          const multi = w.includes(' ');
+          if ((!multi && / $/.test(v)) || v === w + ' ') { Typing.submit(v.trimEnd()); inp.value = ''; }
+          show();
+        });
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (inp.value.trim()) { Typing.submit(inp.value.trim()); inp.value = ''; show(); } } });
+      }
+    };
+  },
+  submit(v) { const T = Typing.cur; const w = T.words[T.i % T.words.length]; if (v === w) { T.ok++; T.typed += w.length + 1; Snd.click(); } else { T.errs++; Snd.bad(); } T.i++; $('#tok').textContent = T.ok; $('#terr').textContent = T.errs; },
+  end() {
+    const T = Typing.cur; clearInterval(T.timer); const wpm = Math.round(T.typed / 5);
+    $('#ti').disabled = true;
+    Kid.typing(wpm); const first = Kid.task('typing');
+    if (wpm >= 25) Kid.medal('typer');
+    $('#tyres').innerHTML = '<div class="card" style="text-align:center"><h2>انتهى الوقت!</h2><p class="big-num">' + wpm + ' كلمة/دقيقة</p><p>' + T.ok + ' كلمة صحيحة · ' + T.errs + ' خطأ</p><p class="muted">الهدف: 25 كلمة في الدقيقة لميدالية «أصابع البرق» ⚡</p><div class="row" style="justify-content:center"><a class="btn" href="#/today">مهام اليوم</a><a class="btn sec" href="#/typing" onclick="setTimeout(()=>App.render(),0)">مرة أخرى</a></div></div>';
+    if (first) { Snd.win(); confetti(50); }
+    setTimeout(App.checkCele, 900);
+  }
+};
+
+/* ---------- certificate PDF (canvas → JPEG → minimal PDF) ---------- */
+const Cert = {
+  async make(stage) {
+    const k = Kid.get(); const W = 1754, H = 1240; const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+    try { await document.fonts.ready; } catch (e) { }
+    const night = stage === 2;
+    g.fillStyle = night ? '#0A0F1F' : '#FFFDF6'; g.fillRect(0, 0, W, H);
+    g.strokeStyle = '#F2A51A'; g.lineWidth = 18; g.strokeRect(40, 40, W - 80, H - 80);
+    g.strokeStyle = night ? '#2BD67B' : '#1E4FA6'; g.lineWidth = 5; g.strokeRect(70, 70, W - 140, H - 140);
+    const img = await Cert.svgImg(Art.hat(stage === 1 ? 5 : 6), 300, 240); if (img) g.drawImage(img, W / 2 - 150, 110, 300, 240);
+    g.textAlign = 'center'; g.direction = 'rtl';
+    const ink = night ? '#E7EEFF' : '#14213D';
+    g.fillStyle = night ? '#4CF09A' : '#1E4FA6'; g.font = '800 92px "Baloo Bhaijaan 2", Tajawal, sans-serif'; g.fillText('شهادة إتمام', W / 2, 440);
+    g.fillStyle = ink; g.font = '500 40px Tajawal, sans-serif'; g.fillText('يشهد عُقاب بأن البطل', W / 2, 530);
+    g.fillStyle = '#C27C00'; g.font = '800 96px "Baloo Bhaijaan 2", Tajawal, sans-serif'; g.fillText(k.name || 'البطل', W / 2, 660);
+    g.fillStyle = ink; g.font = '500 42px Tajawal, sans-serif';
+    g.fillText(stage === 1 ? 'أتمّ بنجاح المرحلة الأولى: أساسيات الحاسوب والأمن السيبراني' : 'أتمّ بنجاح المرحلة الثانية: صيد الأعلام (CTF)', W / 2, 760);
+    g.font = '500 34px Tajawal, sans-serif'; g.fillStyle = night ? '#9AA8C9' : '#5B6B86';
+    if (stage === 1) { g.fillText('الحاسوب · الأمان الشخصي · الطرفية · البرمجة بـ Python · الشبكات', W / 2, 815); g.fillText('الويب · التشفير · التفكير الأمني · التحقيق الرقمي', W / 2, 860); }
+    else g.fillText('الاستطلاع · ثغرات الويب · كسر الشيفرات · تحليل الملفات', W / 2, 830);
+    const D = App.derive();
+    g.fillStyle = ink; g.font = '700 36px Tajawal, sans-serif'; g.fillText('الرتبة: ' + RANKS[D.rank].n + '   ·   ' + D.xp + ' نقطة خبرة', W / 2, 935);
+    const dt = stage === 1 ? k.X.final : Math.max(...D.solved.map(id => k.C[id].d));
+    g.font = '500 32px Tajawal, sans-serif'; g.fillText('التاريخ: ' + fmtDay(dayKey(dt || now())) + ' ' + new Date(dt || now()).getFullYear(), W / 2, 995);
+    const e = await Cert.svgImg(Art.eagle('happy', 6, night), 170, 170); if (e) { g.drawImage(e, 140, H - 330, 170, 170); g.drawImage(e, W - 310, H - 330, 170, 170); }
+    g.font = '700 30px Tajawal, sans-serif'; g.fillText('المدرّب: أخوك الأكبر', W / 2, H - 170);
+    const jpg = cv.toDataURL('image/jpeg', .92);
+    const blob = Cert.pdf(jpg, W, H);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'oqab-certificate-' + stage + '.pdf'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+    toast('تم تحميل الشهادة 🎓'); confetti(80); Snd.fanfare();
+  },
+  svgImg(svg, w, h) { return new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" ')); }); },
+  pdf(dataUrl, w, h) {
+    const bin = atob(dataUrl.split(',')[1]); const img = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) img[i] = bin.charCodeAt(i);
+    const pw = 842, ph = 595; const enc = new TextEncoder(); const parts = []; const offs = []; let len = 0;
+    const push = x => { const b = typeof x === 'string' ? enc.encode(x) : x; parts.push(b); len += b.length; };
+    push('%PDF-1.4\n');
+    const obj = (n, body, stream) => { offs[n] = len; push(n + ' 0 obj\n' + body + '\n'); if (stream) { push('stream\n'); push(stream); push('\nendstream\n'); } push('endobj\n'); };
+    obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+    obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+    obj(3, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pw + ' ' + ph + '] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>');
+    obj(4, '<< /Type /XObject /Subtype /Image /Width ' + w + ' /Height ' + h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + img.length + ' >>', img);
+    const cs = 'q ' + pw + ' 0 0 ' + ph + ' 0 0 cm /Im0 Do Q';
+    obj(5, '<< /Length ' + cs.length + ' >>', enc.encode(cs));
+    const xref = len; let x = 'xref\n0 6\n0000000000 65535 f \n'; for (let n = 1; n <= 5; n++) x += String(offs[n]).padStart(10, '0') + ' 00000 n \n';
+    push(x + 'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF');
+    return new Blob(parts, { type: 'application/pdf' });
+  }
+};
