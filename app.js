@@ -154,7 +154,8 @@ const App = {
   look(night) { if (night == null) night = document.documentElement.dataset.stage === '2'; return App.lookOf(Kid.get(), night); },
   lookOpen(req, D) { if (!req) return true; if (req.rank != null) return D.rank >= req.rank; if (req.crown) return D.crowns >= req.crown || D.king; if (req.flags) return D.solved.length >= req.flags; return true; },
   rankInfo(xp) { let r = 0; RANKS.forEach((x, i) => { if (xp >= x.x) r = i; }); const nx = RANKS[r + 1]; return { i: r, cur: RANKS[r], next: nx, pct: nx ? Math.round((xp - RANKS[r].x) / (nx.x - RANKS[r].x) * 100) : 100 }; },
-  seen() { const pid = Kid.pid(); if (!pid) return null; const d = Dev.get(); d.seen = d.seen || {}; return d.seen[pid] || null; },
+  seenKey() { const pid = Kid.pid(); return pid ? pid + '.' + (Kid.get().g || 0) : null; },
+  seen() { const sk = App.seenKey(); if (!sk) return null; const d = Dev.get(); d.seen = d.seen || {}; return d.seen[sk] || null; },
   applyStage() {
     const d = App.derive(); const pid = Kid.pid(); const r = document.documentElement;
     const sn = App.seen();
@@ -174,6 +175,7 @@ const App = {
     App.lessonKey = null; App.celeOK = true;
     let r = App.parse();
     const free = ['coach', 'coachsetup', 'who', 'newplayer'];
+    if (Kid.pid() && Kid.pid() !== 'demo' && !Prof.one(Kid.pid())) Kid.use(null);
     if (!App.preview && !free.includes(r[0])) {
       if (!Kid.pid()) r = ['who'];
       else if (!Kid.get().pledge) r = ['newplayer'];
@@ -252,10 +254,10 @@ const App = {
   checkCele() {
     if (App.celeOn || App.preview) return;
     const pid = Kid.pid(); if (!pid || !Kid.get().pledge) return;
-    const d = Dev.get(), D = App.derive(), k = Kid.get();
+    const d = Dev.get(), D = App.derive(), k = Kid.get(), sk = App.seenKey();
     d.seen = d.seen || {};
-    if (!d.seen[pid]) { d.seen[pid] = { rank: D.rank, medals: Object.assign({}, k.M), stage2: D.stage2, crowns: D.crowns }; Dev.save(); return; }
-    const s = d.seen[pid]; const q = [];
+    if (!d.seen[sk]) { d.seen[sk] = { rank: D.rank, medals: Object.assign({}, k.M), stage2: D.stage2, crowns: D.crowns }; Dev.save(); return; }
+    const s = d.seen[sk]; const q = [];
     for (const m in k.M) if (!s.medals[m] && MEDALS[m]) q.push(['medal', m]);
     if (D.rank > s.rank) q.push(['rank', D.rank]);
     if (D.rank < s.rank) { s.rank = D.rank; Dev.save(); }
@@ -264,7 +266,7 @@ const App = {
     if (!D.stage2 && s.stage2) { s.stage2 = false; Dev.save(); App.applyStage(); }
     if (!q.length) return;
     const busy = ['lesson', 'test', 'ctfc', 'review', 'typing', 'who', 'newplayer'].includes(App.route[0]) && !App.celeOK;
-    if (busy || App.route[0] === 'who' || App.route[0] === 'newplayer') return;
+    if (busy || ['who', 'newplayer', 'coach', 'coachsetup'].includes(App.route[0])) return;
     App.showCele(q[0]);
   },
   /* preview=true: show it to the coach without changing anyone's progress */
@@ -274,7 +276,7 @@ const App = {
     const finish = () => {
       el.remove(); App.celeOn = false;
       if (preview) { App.applyStage(); App.go('coach'); App.render(); return; }
-      const s = (Dev.get().seen || {})[pid];
+      const s = (Dev.get().seen || {})[App.seenKey()];
       if (s) { if (kind === 'medal') s.medals[val] = 1; else if (kind === 'rank') s.rank = val; else if (kind === 'stage2') s.stage2 = true; else if (kind === 'crown') s.crowns = val; Dev.save(); }
       if (kind === 'stage2') { App.applyStage(); App.go('ctf'); } else App.render();
     };

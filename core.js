@@ -62,7 +62,7 @@ const K_KID = 'oqab_kid', K_COACH = 'oqab_coach', K_DEV = 'oqab_dev', K_BAK = 'o
 const SCHEMA = 2;
 const PIDS = ['k1', 'k2', 'k3', 'k4'];
 
-function emptyKid() { return { v: SCHEMA, name: '', nameU: 0, pledge: 0, L: {}, T: {}, C: {}, M: {}, G: {}, R: {}, D: {}, E: {}, W: {}, MR: {}, X: {}, look: null }; }
+function emptyKid() { return { v: SCHEMA, g: 0, name: '', nameU: 0, pledge: 0, L: {}, T: {}, C: {}, M: {}, G: {}, R: {}, D: {}, E: {}, W: {}, MR: {}, X: {}, look: null }; }
 function emptyCoach() { return { v: SCHEMA, pin: null, U: {}, msgs: {}, wk: null, wkh: {}, ctfU: {}, goal: null }; }
 function emptyProf() { return { v: SCHEMA, list: {} }; }
 
@@ -96,6 +96,8 @@ const same = (a, b) => canon(a) === canon(b);
 const lww = (x, y) => (!x ? y : !y ? x : ((y.u || 0) !== (x.u || 0) ? ((y.u || 0) > (x.u || 0) ? y : x) : (canon(y) > canon(x) ? y : x)));
 function mergeKid(a, b) {
   a = migrateKid(a || emptyKid()); b = migrateKid(b || emptyKid());
+  /* a deleted player bumps the generation: the newer generation replaces the old progress completely */
+  if ((a.g || 0) !== (b.g || 0)) return JSON.parse(JSON.stringify((a.g || 0) > (b.g || 0) ? a : b));
   const o = Object.assign({}, b, a);
   o.v = Math.max(a.v || 1, b.v || 1);
   if ((b.nameU || 0) > (a.nameU || 0) || ((b.nameU || 0) === (a.nameU || 0) && (b.name || '') > (a.name || ''))) { o.name = b.name; o.nameU = b.nameU; } else { o.name = a.name; o.nameU = a.nameU; }
@@ -145,15 +147,15 @@ const Prof = (() => {
   const ls = [];
   return {
     get: () => p,
-    list() { return PIDS.filter(id => p.list[id] && !p.list[id].hide).map(id => Object.assign({ id }, p.list[id])); },
-    one: id => p.list[id] || null,
+    list() { return PIDS.filter(id => p.list[id] && !p.list[id].hide && !p.list[id].del).map(id => Object.assign({ id }, p.list[id])); },
+    one: id => (p.list[id] && !p.list[id].del) ? p.list[id] : null,
     mergeIn(x) { const m = mergeProf(p, x); const ch = !same(m, p); p = m; LS.set(K_PROF, p); if (ch) ls.forEach(f => f()); return ch; },
     replace(x) { p = migrateProf(x); LS.set(K_PROF, p); ls.forEach(f => f()); },
     on(f) { ls.push(f); },
     set(id, obj) { p.list[id] = Object.assign({}, p.list[id] || {}, obj, { u: now() }); LS.set(K_PROF, p); ls.forEach(f => f()); Sync.schedule(); },
-    freeId() { return PIDS.find(id => !p.list[id]); },
+    freeId() { return PIDS.find(id => !p.list[id] || p.list[id].del); },
     async hash(id, salt, pw) { return sha('oqab-pw|' + id + '|' + salt + '|' + String(pw).trim().toLowerCase()); },
-    async create(name, pw) { const id = Prof.freeId(); if (!id) return null; const salt = rid(10); const h = await Prof.hash(id, salt, pw); Prof.set(id, { name, salt, h, c: now() }); return id; },
+    async create(name, pw) { const id = Prof.freeId(); if (!id) return null; const salt = rid(10); const h = await Prof.hash(id, salt, pw); Prof.set(id, { name, salt, h, c: now(), del: false, hide: false }); return id; },
     async check(id, pw) { const x = p.list[id]; if (!x) return false; return (await Prof.hash(id, x.salt, pw)) === x.h; },
     async setPw(id, pw) { const salt = rid(10); Prof.set(id, { salt, h: await Prof.hash(id, salt, pw) }); }
   };
@@ -178,6 +180,7 @@ const Kid = (() => {
     use(id, remember = true) { pid = id || null; s = of(pid); if (remember) SS.set('oqab_pid', pid); if (pid && pid !== 'demo') { const bak = LS.get(K_BAK + '_' + pid, null); if (!bak || bak.day !== dayKey()) LS.set(K_BAK + '_' + pid, { day: dayKey(), kid: s }); } ls.forEach(f => f()); },
     mergeInto(id, x) { const cur = of(id); const m = mergeKid(cur, x); const ch = !same(m, cur); cache[id] = m; if (id === pid) s = m; persist(id); if (ch) ls.forEach(f => f()); return ch; },
     mergeIn(x) { return pid ? Kid.mergeInto(pid, x) : false; },
+    reset(id) { const old = of(id); const e = emptyKid(); e.g = (old.g || 0) + 1; cache[id] = e; if (id === pid) { s = e; } persist(id); ls.forEach(f => f()); Sync.schedule(); },
     on(f) { ls.push(f); },
     save, ev, today, live,
     seeTerm(id) { if (!live()) return; if (!s.G[id]) { s.G[id] = now(); clearTimeout(pushT); pushT = setTimeout(save, 400); } },
