@@ -43,10 +43,13 @@ const App = {
     window.addEventListener('hashchange', () => App.render());
     Kid.on(() => App.onKid());
     Coach.on(() => App.onCoach());
-    document.addEventListener('pointerdown', () => { App.lastAct = now(); }, true);
-    document.addEventListener('keydown', () => { App.lastAct = now(); }, true);
+    Prof.on(() => { if (['who', 'league', 'coach'].includes(App.route[0])) App.render(); });
+    const act = () => { App.lastAct = now(); };
+    document.addEventListener('pointerdown', act, true);
+    document.addEventListener('keydown', act, true);
     document.addEventListener('click', App.onClick);
     document.addEventListener('mouseover', e => { const t = e.target.closest && e.target.closest('.term'); if (t) App.termTip(t, false); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden && CoachUI.open) { CoachUI.open = false; App.hiddenLock = true; } else if (!document.hidden && App.hiddenLock) { App.hiddenLock = false; if (App.route[0] === 'coach') App.render(); } });
     App.lastAct = now();
     setInterval(App.tick, 5000);
     if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
@@ -55,82 +58,139 @@ const App = {
   cloudReady(m) { Sync.attach(m); },
   cloudFail() { Sync.fail(); },
   tick() {
-    if (document.hidden || App.preview || Dev.get().role === 'coach') return;
-    if (now() - App.lastAct > 60000) return;
+    const idle = now() - App.lastAct;
+    // the coach panel closes by itself after 3 idle minutes
+    if (CoachUI.open && idle > 180000) { CoachUI.open = false; if (App.route[0] === 'coach') App.render(); }
+    // a player is signed out after 30 idle minutes (shared device)
+    if (Kid.pid() && !App.preview && idle > 30 * 60000) { Kid.use(null); App.go('who'); return; }
+    if (document.hidden || App.preview || Dev.get().role === 'coach' || !Kid.pid()) return;
+    if (idle > 60000) return;
     if (!Kid.get().pledge) return;
     Kid.tick(5, App.lessonKey);
     if (Math.random() < .2) Sync.schedule();
   },
-  refresh() { if (App.route[0] === 'lesson' || App.route[0] === 'test' || App.route[0] === 'ctfc' || App.route[0] === 'review' || App.route[0] === 'typing') { App.paintTop(); return; } App.render(); },
+  refresh() { if (['lesson', 'test', 'ctfc', 'review', 'typing', 'newplayer'].includes(App.route[0])) { App.paintTop(); return; } App.render(); },
   onKid() { App.paintTop(); App.checkCele(); },
-  onCoach() { App.applyStage(); if (App.route[0] === 'today' || App.route[0] === 'map' || App.route[0] === 'coach') { /* light refresh */ } App.checkMsgs(); },
+  onCoach() { App.applyStage(); App.checkMsgs(); },
 
   /* ---------- derived ---------- */
-  derive() {
-    const k = Kid.get(), c = Coach.get();
-    const units = C.units;
-    let xp = 0;
-    const lessonsDone = {};
-    for (const key in k.L) if (k.L[key].d) { xp += 20; lessonsDone[key] = 1; }
-    for (const u in k.T) if (k.T[u].p) xp += 100 + Math.max(0, (k.T[u].b || 0) - 80) * 2;
-    for (const m in k.M) if (MEDALS[m]) xp += 50;
-    for (const id in k.C) if (k.C[id].d) { const ch = C.ctf.find(x => x.id === id); if (ch) xp += Math.max(Math.round(ch.pts / 2), ch.pts - 15 * (k.C[id].h || 0)); }
+  /* every XP source with its time, so we can total it for any period */
+  xpItems(k) {
+    const it = []; const noon = d => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd, 12).getTime(); };
+    for (const key in k.L) if (k.L[key].d) it.push([k.L[key].d, 20]);
+    for (const u in k.T) if (k.T[u].p) it.push([k.T[u].p, 100 + Math.max(0, (k.T[u].b || 0) - 80) * 2]);
+    for (const m in k.M) if (MEDALS[m]) it.push([k.M[m], 50]);
+    for (const id in k.C) if (k.C[id].d) { const ch = C.ctf.find(x => x.id === id); if (ch) it.push([k.C[id].d, Math.max(Math.round(ch.pts / 2), ch.pts - 15 * (k.C[id].h || 0))]); }
     const active = {};
     for (const day in k.D) {
-      const devs = k.D[day]; const tk = {}; let rx = 0, ty = 0;
-      for (const dv in devs) { Object.assign(tk, devs[dv].k || {}); rx = Math.max(rx, devs[dv].rx || 0); ty = Math.max(ty, devs[dv].ty || 0); }
-      if (tk.typing) xp += 10; if (tk.review) xp += 10; xp += Math.min(20, rx * 2);
+      const devs = k.D[day]; const tk = {}; let rx = 0;
+      for (const dv in devs) { Object.assign(tk, devs[dv].k || {}); rx = Math.max(rx, devs[dv].rx || 0); }
+      let x = 0; if (tk.typing) x += 10; if (tk.review) x += 10; x += Math.min(20, rx * 2);
       const n = (tk.typing ? 1 : 0) + (tk.review ? 1 : 0) + (tk.lesson ? 1 : 0);
-      if (n === 3) xp += 20;
-      if (n >= 2) active[day] = n;
+      if (n === 3) x += 20; if (n >= 2) active[day] = n;
+      if (x) it.push([noon(day), x]);
     }
-    for (const w in k.W) xp += 50;
-    if (k.X.final) xp += 200;
-    // streak
+    for (const w in k.W) it.push([k.W[w].d || 0, 50]);
+    if (k.X.final) it.push([k.X.final, 200]);
+    return { it, active };
+  },
+  weekStart(t) { const d = new Date(t || now()); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 1) % 7)); return d.getTime(); },
+  /* family league: weekly XP per player, shared-goal bonus and crowns */
+  league() {
+    const ps = Prof.list(); const goal = (Coach.get().goal && Coach.get().goal.n) || 400;
+    const base = {}; ps.forEach(p => { base[p.id] = App.xpItems(Kid.of(p.id)).it; });
+    const wk = t => App.weekStart(t);
+    const weeks = {}; // weekStart -> {pid: xp}
+    ps.forEach(p => base[p.id].forEach(([t, x]) => { const w = wk(t); weeks[w] = weeks[w] || {}; weeks[w][p.id] = (weeks[w][p.id] || 0) + x; }));
+    const cur = wk(now()); const bonus = {}; const crowns = {}; let lastWinner = null;
+    Object.keys(weeks).map(Number).sort().forEach(w => {
+      const W = weeks[w]; const sum = Object.values(W).reduce((a, b) => a + b, 0);
+      if (ps.length > 1 && sum >= goal) ps.forEach(p => { if (W[p.id]) bonus[p.id] = (bonus[p.id] || 0) + 30; });
+      if (w < cur && ps.length > 1) { const best = Object.entries(W).sort((a, b) => b[1] - a[1]); if (best[0] && (!best[1] || best[0][1] > best[1][1])) { crowns[best[0][0]] = (crowns[best[0][0]] || 0) + 1; lastWinner = best[0][0]; } else lastWinner = null; }
+    });
+    const prev = cur - 7 * 864e5; const pw = weeks[prev] || {}; const pr = Object.entries(pw).sort((a, b) => b[1] - a[1]);
+    const king = ps.length > 1 && pr[0] && (!pr[1] || pr[0][1] > pr[1][1]) ? pr[0][0] : null;
+    const thisWeek = weeks[cur] || {}; const sumNow = Object.values(thisWeek).reduce((a, b) => a + b, 0);
+    return { ps, goal, weeks, cur, thisWeek, sumNow, bonus, crowns, king };
+  },
+  derive(pid) {
+    pid = pid || Kid.pid();
+    const k = pid ? Kid.of(pid) : Kid.get();
+    const units = C.units;
+    const { it, active } = App.xpItems(k);
+    const lg = Prof.list().length > 1 ? App.league() : null;
+    let xp = it.reduce((a, b) => a + b[1], 0) + (lg && lg.bonus[pid] || 0);
+    const ws = App.weekStart(); const week = it.filter(x => x[0] >= ws).reduce((a, b) => a + b[1], 0);
+    const lessonsDone = {}; for (const key in k.L) if (k.L[key].d) lessonsDone[key] = 1;
     let streak = 0; const today = dayKey();
     let cur = active[today] ? today : addDays(today, -1);
     while (active[cur]) { streak++; cur = addDays(cur, -1); }
     let rank = 0; RANKS.forEach((r, i) => { if (xp >= r.x) rank = i; });
-    // unlocks
     const st = {};
     units.forEach((u, i) => {
       const prev = units[i - 1];
       let open = i === 0 || !!(k.T[prev.id] && k.T[prev.id].p);
-      const ov = c.U[u.id] && c.U[u.id].m;
+      const ov = Coach.unit(pid, u.id);
       if (ov === 'open') open = true; if (ov === 'lock') open = false;
       const ld = u.lessons.filter(l => k.L[u.id + '.' + l.id] && k.L[u.id + '.' + l.id].d).length;
       st[u.id] = { open, ld, total: u.lessons.length, passed: !!(k.T[u.id] && k.T[u.id].p), best: (k.T[u.id] && k.T[u.id].b) || 0, ov };
     });
     const last = units[units.length - 1];
     let finalOpen = !!(k.T[last.id] && k.T[last.id].p);
-    const fov = c.U.final && c.U.final.m; if (fov === 'open') finalOpen = true; if (fov === 'lock') finalOpen = false;
+    const fov = Coach.unit(pid, 'final'); if (fov === 'open') finalOpen = true; if (fov === 'lock') finalOpen = false;
     const fl = C.final ? C.final.lessons.filter(l => k.L['final.' + l.id] && k.L['final.' + l.id].d).length : 0;
     st.final = { open: finalOpen, ld: fl, total: C.final ? C.final.lessons.length : 0, passed: !!k.X.final, ov: fov };
     let stage2 = !!k.X.final;
-    const cu = c.ctfU && c.ctfU.m; if (cu === 'open') stage2 = true; if (cu === 'lock') stage2 = false;
+    const cu = Coach.stage2(pid); if (cu === 'open') stage2 = true; if (cu === 'lock') stage2 = false;
     const solved = Object.keys(k.C).filter(id => k.C[id].d && C.ctf.some(x => x.id === id));
-    return { xp, rank, streak, active, st, stage2, solved, lessonsDone };
+    const crowns = lg ? (lg.crowns[pid] || 0) : 0, king = lg ? lg.king === pid : false;
+    return { xp, week, rank, streak, active, st, stage2, solved, lessonsDone, crowns, king };
   },
+  /* the player's chosen look (with safe defaults) */
+  lookOf(k, night) {
+    const L = (k && k.look) || {}; const s = night ? 's2' : 's1'; const cat = Art.LOOKS[s]; const v = L[s] || {};
+    return { cos: cat.cos.some(c => c[0] === v.cos) ? v.cos : cat.cos[0][0], col: cat.col.includes(v.col) ? v.col : cat.col[0], th: cat.th.some(t => t[0] === v.th) ? v.th : cat.th[0][0] };
+  },
+  look(night) { if (night == null) night = document.documentElement.dataset.stage === '2'; return App.lookOf(Kid.get(), night); },
+  lookOpen(req, D) { if (!req) return true; if (req.rank != null) return D.rank >= req.rank; if (req.crown) return D.crowns >= req.crown || D.king; if (req.flags) return D.solved.length >= req.flags; return true; },
   rankInfo(xp) { let r = 0; RANKS.forEach((x, i) => { if (xp >= x.x) r = i; }); const nx = RANKS[r + 1]; return { i: r, cur: RANKS[r], next: nx, pct: nx ? Math.round((xp - RANKS[r].x) / (nx.x - RANKS[r].x) * 100) : 100 }; },
-  applyStage() { const d = App.derive(); const s2 = d.stage2 && Dev.get().role !== 'coach' ? (Dev.get().seen && Dev.get().seen.stage2 ? '2' : '') : ''; if (s2) document.documentElement.dataset.stage = '2'; else delete document.documentElement.dataset.stage; return d; },
+  seen() { const pid = Kid.pid(); if (!pid) return null; const d = Dev.get(); d.seen = d.seen || {}; return d.seen[pid] || null; },
+  applyStage() {
+    const d = App.derive(); const pid = Kid.pid(); const r = document.documentElement;
+    const sn = App.seen();
+    const s2 = !!pid && d.stage2 && Dev.get().role !== 'coach' && !!(sn && sn.stage2) || (App.preview && d.stage2);
+    if (s2) r.dataset.stage = '2'; else delete r.dataset.stage;
+    const k = Kid.get(); const l1 = App.lookOf(k, false), l2 = App.lookOf(k, true);
+    if (pid && l1.th !== 'sky') r.dataset.th = l1.th; else delete r.dataset.th;
+    if (pid && l2.th !== 'neon') r.dataset.th2 = l2.th; else delete r.dataset.th2;
+    return d;
+  },
 
   /* ---------- router ---------- */
   go(h) { if (location.hash === '#' + h) App.render(); else location.hash = h; },
   parse() { const h = (location.hash || '').replace(/^#\/?/, ''); return h ? h.split('/').map(decodeURIComponent) : []; },
   render() {
-    const k = Kid.get(), d = Dev.get();
+    const d = Dev.get();
     App.lessonKey = null; App.celeOK = true;
     let r = App.parse();
-    if (d.role !== 'coach' && !k.pledge && r[0] !== 'coach' && r[0] !== 'coachsetup') r = ['welcome'];
-    if (!r.length) r = [d.role === 'coach' && !App.preview ? 'coach' : 'map'];
+    if (r[0] !== 'coach') CoachUI.open = false;
+    const free = ['coach', 'coachsetup', 'who', 'newplayer'];
+    if (d.role === 'coach' && !App.preview && !free.includes(r[0])) r = ['coach'];
+    if (d.role !== 'coach' && !App.preview && !free.includes(r[0])) {
+      if (!Kid.pid()) r = ['who'];
+      else if (!Kid.get().pledge) r = ['newplayer'];
+    }
+    if (!r.length) r = ['map'];
+    if (r[0] === 'who' && Kid.pid() && Kid.get().pledge && !App.preview) { Kid.use(null); }
     App.route = r;
     const D = App.applyStage();
-    const views = { welcome: Views.welcome, map: Views.map, unit: Views.unit, lesson: Views.lesson, test: Views.test, today: Views.today, review: Views.review, typing: Views.typing, glossary: Views.glossary, me: Views.me, coach: CoachUI.view, coachsetup: CoachUI.setup, ctf: Views.ctf, ctfc: Views.ctfc, next: Views.next, weekly: Views.weekly };
+    const views = { who: Views.who, newplayer: Views.newplayer, map: Views.map, unit: Views.unit, lesson: Views.lesson, test: Views.test, today: Views.today, review: Views.review, typing: Views.typing, glossary: Views.glossary, me: Views.me, look: Views.look, league: Views.league, coach: CoachUI.view, coachsetup: CoachUI.setup, ctf: Views.ctf, ctfc: Views.ctfc, next: Views.next, weekly: Views.weekly };
     const v = views[r[0]] || Views.map;
     const app = $('#app');
     const out = v(r, D) || {};
-    const showTop = r[0] !== 'welcome' && r[0] !== 'lesson' && r[0] !== 'test' && r[0] !== 'review' && r[0] !== 'typing';
-    app.innerHTML = (showTop ? App.topHtml(D) : '') + ((App.preview || d.role === 'coach') && r[0] !== 'coach' && r[0] !== 'coachsetup' ? '<div class="card" style="background:var(--warn-bg);padding:8px 12px;margin:6px 0">' + ic('eye', 18) + ' <b>وضع المعاينة:</b> ترى ما يراه أخوك، ولا يُسجَّل أي شيء. <button class="btn sm sec" data-act="preview-off">لوحة المدرب</button></div>' : '') + (out.html || '');
+    const showTop = !['who', 'newplayer', 'lesson', 'test', 'review', 'typing', 'coachsetup'].includes(r[0]) && !(r[0] === 'coach' && d.role === 'coach' && !App.preview) && Kid.pid();
+    const pv = App.preview && r[0] !== 'coach' && r[0] !== 'coachsetup';
+    app.innerHTML = (showTop ? App.topHtml(D) : '') + (pv ? '<div class="card" style="background:var(--warn-bg);padding:8px 12px;margin:6px 0">' + ic('eye', 18) + ' <b>وضع المعاينة:</b> ترى ما يراه ' + esc((Prof.one(Kid.pid()) || {}).name || 'أخوك') + '، ولا يُسجَّل أي شيء. <button class="btn sm sec" data-act="preview-off">لوحة المدرب</button></div>' : '') + (out.html || '');
     App.paintTabs(r[0]);
     window.scrollTo(0, 0);
     if (out.mount) out.mount();
@@ -139,9 +199,11 @@ const App = {
   },
   topHtml(D) {
     const night = document.documentElement.dataset.stage === '2';
+    const p = Prof.one(Kid.pid()) || {};
     return '<header class="top"><a class="brand" href="#/map">' + Art.logo(night) + '<span>' + (night ? 'عُقاب 🌙' : 'عُقاب') + '</span></a><span class="sp"></span>' +
       '<span class="chip" title="سلسلة الأيام">' + ic('fire', 18) + '<span id="t-streak">' + D.streak + '</span></span>' +
-      '<span class="chip" title="نقاط الخبرة">' + ic('star', 18) + '<span id="t-xp">' + D.xp + '</span></span></header><div class="sync" id="sync"></div>';
+      '<span class="chip" title="نقاط الخبرة">' + ic('star', 18) + '<span id="t-xp">' + D.xp + '</span></span>' +
+      '<button class="me-chip" data-act="switch" title="تبديل اللاعب">' + Art.eagle('happy', D.rank, night) + esc(p.name || '') + (D.king ? ' <span class="crown">👑</span>' : '') + '</button></header><div class="sync" id="sync"></div>';
   },
   paintTop() { const D = App.derive(); const a = $('#t-xp'), b = $('#t-streak'); if (a) a.textContent = D.xp; if (b) b.textContent = D.streak; },
   paintSync() {
@@ -150,13 +212,14 @@ const App = {
     el.className = 'sync ' + (s === 'on' ? 'on' : s === 'wait' ? 'wait' : ''); el.innerHTML = '<i></i>' + txt;
   },
   paintTabs(cur) {
-    const t = $('#tabs'); const d = Dev.get(); const hide = ['welcome', 'lesson', 'test', 'review', 'typing', 'coachsetup'].includes(cur);
+    const t = $('#tabs'); const d = Dev.get(); const hide = ['who', 'newplayer', 'lesson', 'test', 'review', 'typing', 'coachsetup'].includes(cur) || (!Kid.pid() && cur !== 'coach') || (d.role === 'coach' && !App.preview);
     t.classList.toggle('hide', hide); if (hide) return;
     const D = App.derive();
     const items = [['map', 'map', 'الرحلة'], ['today', 'sun', 'اليوم']];
     if (D.stage2) items.push(['ctf', 'flag', 'الأعلام']);
-    items.push(['glossary', 'book', 'القاموس'], ['me', 'hat', 'ملفي'], ['coach', d.role === 'coach' ? 'unlock' : 'lock', 'المدرب']);
-    const map = { unit: 'map', ctfc: 'ctf', next: 'ctf', weekly: 'today' };
+    if (Prof.list().length > 1) items.push(['league', 'star', 'الأبطال']);
+    items.push(['me', 'hat', 'ملفي'], ['coach', 'lock', 'المدرب']);
+    const map = { unit: 'map', ctfc: 'ctf', next: 'ctf', weekly: 'today', glossary: 'me', look: 'me' };
     const c = map[cur] || cur;
     t.innerHTML = '<div class="in">' + items.map(i => '<a href="#/' + i[0] + '"' + (c === i[0] ? ' aria-current="page"' : '') + '>' + ic(i[1]) + i[2] + '</a>').join('') + '</div>';
   },
@@ -172,58 +235,70 @@ const App = {
       case 'go': App.go(v); break;
       case 'sound': Dev.set('sound', Dev.get().sound ? 0 : 1); App.render(); break;
       case 'big': Dev.set('big', Dev.get().big ? 0 : 1); if (Dev.get().big) document.documentElement.dataset.big = '1'; else delete document.documentElement.dataset.big; App.render(); break;
-      case 'preview-off': App.preview = false; App.go('coach'); break;
+      case 'preview-off': App.endPreview(); break;
       case 'cert': Cert.make(+v); break;
       case 'link': Views.linkDialog(); break;
+      case 'switch': if (App.preview) { App.endPreview(); break; } modal('<h2>تبديل اللاعب</h2><p>تريد الخروج ليلعب أخوك؟ تقدّمك محفوظ.</p><div class="row"><button class="btn" id="swy">نعم، خروج</button><button class="btn sec" data-close>لا</button></div>').el.querySelector('#swy').onclick = () => { $('.modal').remove(); Kid.use(null); App.go('who'); }; break;
     }
   },
+  startPreview(pid) { App.preview = true; App.prevPid = Kid.pid(); Kid.use(pid, false); App.go('map'); },
+  endPreview() { App.preview = false; Kid.use(SS.get('oqab_pid'), false); App.go('coach'); },
   termTip(el, click) {
     const t = C.terms[el.dataset.term]; if (!t) return;
     if (!click) { el.title = t.ar + (t.en ? ' (' + t.en + ')' : '') + ': ' + t.d; return; }
     modal('<h2>' + esc(t.ar) + (t.en ? ' <span class="mono muted" style="font-size:.7em">(' + esc(t.en) + ')</span>' : '') + '</h2><p>' + md(t.d) + '</p>' + (t.ex ? '<p class="muted">مثال: ' + md(t.ex) + '</p>' : '') + '<button class="btn wide" data-close>فهمت</button>');
   },
 
-  /* ---------- celebrations ---------- */
+  /* ---------- celebrations (seen state is per player, per device) ---------- */
   checkCele() {
     if (App.celeOn || App.preview || Dev.get().role === 'coach') return;
-    if (!Kid.get().pledge) return;
+    const pid = Kid.pid(); if (!pid || !Kid.get().pledge) return;
     const d = Dev.get(), D = App.derive(), k = Kid.get();
-    if (!d.seen) { d.seen = { rank: D.rank, medals: Object.assign({}, k.M), stage2: D.stage2, s1: !!k.X.final }; Dev.save(); return; }
-    const s = d.seen; const q = [];
+    d.seen = d.seen || {};
+    if (!d.seen[pid]) { d.seen[pid] = { rank: D.rank, medals: Object.assign({}, k.M), stage2: D.stage2, crowns: D.crowns }; Dev.save(); return; }
+    const s = d.seen[pid]; const q = [];
     for (const m in k.M) if (!s.medals[m] && MEDALS[m]) q.push(['medal', m]);
     if (D.rank > s.rank) q.push(['rank', D.rank]);
     if (D.rank < s.rank) { s.rank = D.rank; Dev.save(); }
+    if ((D.crowns || 0) > (s.crowns || 0)) q.push(['crown', D.crowns]);
     if (D.stage2 && !s.stage2) q.push(['stage2']);
     if (!D.stage2 && s.stage2) { s.stage2 = false; Dev.save(); App.applyStage(); }
     if (!q.length) return;
-    const busy = ['lesson', 'test', 'ctfc', 'review', 'typing'].includes(App.route[0]) && !App.celeOK;
-    if (busy) return;
+    const busy = ['lesson', 'test', 'ctfc', 'review', 'typing', 'who', 'newplayer'].includes(App.route[0]) && !App.celeOK;
+    if (busy || App.route[0] === 'who' || App.route[0] === 'newplayer') return;
     App.showCele(q[0]);
   },
-  showCele(item) {
-    App.celeOn = true; const s = Dev.get().seen; const [kind, val] = item;
+  /* preview=true: show it to the coach without changing anyone's progress */
+  showCele(item, preview) {
+    App.celeOn = true; const [kind, val] = item; const pid = Kid.pid();
     const el = document.createElement('div'); el.className = 'cele';
     const finish = () => {
-      if (kind === 'medal') s.medals[val] = 1; else if (kind === 'rank') s.rank = val; else if (kind === 'stage2') s.stage2 = true;
-      Dev.save(); el.remove(); App.celeOn = false;
-      if (kind === 'stage2') { App.applyStage(); App.go('ctf'); } else { App.render(); }
+      el.remove(); App.celeOn = false;
+      if (preview) { App.applyStage(); App.go('coach'); App.render(); return; }
+      const s = (Dev.get().seen || {})[pid];
+      if (s) { if (kind === 'medal') s.medals[val] = 1; else if (kind === 'rank') s.rank = val; else if (kind === 'stage2') s.stage2 = true; else if (kind === 'crown') s.crowns = val; Dev.save(); }
+      if (kind === 'stage2') { App.applyStage(); App.go('ctf'); } else App.render();
     };
     if (kind === 'stage2') {
       el.classList.add('stage2-intro');
-      el.innerHTML = '<div style="max-width:520px"><p id="s2a" style="opacity:0;transition:opacity 1s;font-size:1.2em">أنهيت المرحلة الأولى...<br>أصبحت تفهم كيف يعمل كل شيء.</p><div id="s2b" style="opacity:0;transition:opacity 1s">' + Art.eagle('wow', 6, true).replace('class="eagle"', 'class="eagle" style="width:150px"') + '<div class="glitch">صيد الأعلام</div><p>الآن يتغيّر كل شيء: الليل نزل، وعُقاب صار صيّاداً.<br>تحديات حقيقية داخل عالم وهمي آمن. كل علم تلتقطه يثبت مهارتك.</p><button class="btn wide" data-x="go">ابدأ الصيد</button></div></div>';
+      el.innerHTML = '<div style="max-width:520px"><p id="s2a" style="opacity:0;transition:opacity 1s;font-size:1.2em">أنهيت المرحلة الأولى...<br>أصبحت تفهم كيف يعمل كل شيء.</p><div id="s2b" style="opacity:0;transition:opacity 1s">' + Art.eagle('wow', 6, true, App.lookOf(Kid.get(), true)).replace('class="eagle"', 'class="eagle" style="width:150px"') + '<div class="glitch">صيد الأعلام</div><p>الآن يتغيّر كل شيء: الليل نزل، وعُقاب صار صيّاداً. وفي خزانتك أزياء وألوان ليلية جديدة!<br>تحديات حقيقية داخل عالم وهمي آمن. كل علم تلتقطه يثبت مهارتك.</p><button class="btn wide" data-x="go">' + (preview ? 'إنهاء المعاينة' : 'ابدأ الصيد') + '</button></div></div>';
       document.body.appendChild(el); Snd.whoosh();
+      const root = document.documentElement; const had = root.dataset.stage;
       setTimeout(() => { $('#s2a', el).style.opacity = 1; }, 200);
-      setTimeout(() => { $('#s2a', el).style.opacity = 0; document.documentElement.dataset.stage = '2'; }, 2600);
+      setTimeout(() => { $('#s2a', el).style.opacity = 0; root.dataset.stage = '2'; }, 2600);
       setTimeout(() => { $('#s2b', el).style.opacity = 1; Snd.fanfare(); confetti(120); }, 3400);
-      el.addEventListener('click', e => { if (e.target.closest('[data-x="go"]')) finish(); });
+      el.addEventListener('click', e => { if (e.target.closest('[data-x="go"]')) { if (preview && !had) delete root.dataset.stage; finish(); } });
       return;
     }
-    const prize = kind === 'medal' ? Art.medal(MEDALS[val].ic, (DOMAINS[MEDALS[val].d] || DOMAINS.gen)[1]) : Art.hat(val);
-    const title = kind === 'medal' ? 'ميدالية جديدة!' : 'رتبة جديدة!';
-    const sub = kind === 'medal' ? '<p style="font-size:1.4em;font-weight:800">' + esc(MEDALS[val].n) + '</p><p>' + esc(MEDALS[val].how) + '</p>' : '<p style="font-size:1.4em;font-weight:800">' + esc(RANKS[val].n) + '</p><p>قبعتك البيضاء تطوّرت! ' + (RANKS[val + 1] ? 'الرتبة التالية: ' + RANKS[val + 1].n : 'وصلت لأعلى رتبة!') + '</p>';
-    el.innerHTML = '<div class="rays"></div><p style="position:relative;opacity:.85">هدية من عُقاب</p><h2 style="position:relative">اضغط على الهدية لتفتحها</h2>' +
+    const night = document.documentElement.dataset.stage === '2';
+    const prize = kind === 'medal' ? Art.medal(MEDALS[val].ic, (DOMAINS[MEDALS[val].d] || DOMAINS.gen)[1]) : kind === 'crown' ? Art.eagle('happy', 6, night, Object.assign({}, App.look(night), night ? {} : { cos: 'king' })) : Art.hat(val);
+    const title = kind === 'medal' ? 'ميدالية جديدة!' : kind === 'crown' ? 'بطل الأسبوع! 👑' : 'رتبة جديدة!';
+    const sub = kind === 'medal' ? '<p style="font-size:1.4em;font-weight:800">' + esc(MEDALS[val].n) + '</p><p>' + esc(MEDALS[val].how) + '</p>'
+      : kind === 'crown' ? '<p>جمعت أكثر نقاط في الأسبوع الماضي! التاج معك طوال هذا الأسبوع، و<b>زي الملك</b> صار مفتوحاً في خزانتك.</p>'
+        : '<p style="font-size:1.4em;font-weight:800">' + esc(RANKS[val].n) + '</p><p>قبعتك البيضاء تطوّرت! ' + (RANKS[val + 1] ? 'الرتبة التالية: ' + RANKS[val + 1].n : 'وصلت لأعلى رتبة!') + '</p>';
+    el.innerHTML = '<div class="rays"></div><p style="position:relative;opacity:.85">' + (preview ? 'معاينة · ' : '') + 'هدية من عُقاب</p><h2 style="position:relative">اضغط على الهدية لتفتحها</h2>' +
       '<button class="gift" aria-label="افتح الهدية"><svg viewBox="0 0 170 170"><rect x="25" y="70" width="120" height="90" rx="12" fill="#E04B4B" stroke="#7A1A1A" stroke-width="5"/><rect x="77" y="70" width="16" height="90" fill="#FFD36B"/><g class="lid"><rect x="15" y="48" width="140" height="30" rx="10" fill="#FF6B6B" stroke="#7A1A1A" stroke-width="5"/><rect x="77" y="48" width="16" height="30" fill="#FFD36B"/><path d="M85 48 q-30 -36 -40 -8 q10 10 40 8 q30 2 40 -8 q-10 -28 -40 8" fill="#FFD36B" stroke="#C27C00" stroke-width="4"/></g></svg></button>' +
-      '<div class="after hide" style="position:relative"><div class="prize">' + prize + '</div><h2>' + title + '</h2>' + sub + '<button class="btn gold" data-x="ok" style="min-width:200px">رائع!</button></div>';
+      '<div class="after hide" style="position:relative"><div class="prize">' + prize + '</div><h2>' + title + '</h2>' + sub + '<button class="btn gold" data-x="ok" style="min-width:200px">' + (preview ? 'إنهاء المعاينة' : 'رائع!') + '</button></div>';
     document.body.appendChild(el);
     el.addEventListener('click', e => {
       const g = e.target.closest('.gift');
@@ -235,14 +310,14 @@ const App = {
     });
   },
   checkMsgs() {
-    if (App.preview || Dev.get().role === 'coach' || App.celeOn || $('.modal')) return;
-    if (['lesson', 'test', 'ctfc', 'welcome', 'review', 'typing'].includes(App.route[0])) return;
-    const c = Coach.get(), k = Kid.get();
-    const unread = Object.entries(c.msgs || {}).filter(([id, m]) => !k.MR[id]).sort((a, b) => a[1].t - b[1].t);
+    if (App.preview || Dev.get().role === 'coach' || App.celeOn || $('.modal') || !Kid.pid()) return;
+    if (['lesson', 'test', 'ctfc', 'who', 'newplayer', 'review', 'typing'].includes(App.route[0])) return;
+    const c = Coach.get(), k = Kid.get(), pid = Kid.pid();
+    const unread = Object.entries(c.msgs || {}).filter(([id, m]) => (!m.to || m.to === '*' || m.to === pid) && !k.MR[id]).sort((a, b) => a[1].t - b[1].t);
     if (!unread.length) return;
     const [id, m] = unread[0];
     Snd.win();
-    modal('<div style="text-align:center">' + Art.eagle('happy', App.derive().rank).replace('class="eagle"', 'class="eagle" style="width:90px"') + '<p class="muted" style="margin:0">رسالة من أخيك</p></div><div class="card" style="font-size:1.12em;font-weight:700;white-space:pre-wrap">' + esc(m.x) + '</div><button class="btn wide" data-close>شكراً!</button>', { sticky: true, onClose: () => { Kid.msgRead(id); setTimeout(App.checkMsgs, 300); } });
+    modal('<div style="text-align:center">' + Art.eagle('happy', App.derive().rank).replace('class="eagle"', 'class="eagle" style="width:90px"') + '<p class="muted" style="margin:0">رسالة من أخيك الكبير</p></div><div class="card" style="font-size:1.12em;font-weight:700;white-space:pre-wrap">' + esc(m.x) + '</div><button class="btn wide" data-close>شكراً!</button>', { sticky: true, onClose: () => { Kid.msgRead(id); setTimeout(App.checkMsgs, 300); } });
   }
 };
 
@@ -257,15 +332,49 @@ function buildIndex() {
 
 /* ---------- views ---------- */
 const Views = {
-  welcome(r) {
-    const k = Kid.get();
-    const step = App.wstep || 0;
-    let h = '<div style="padding-top:20px">';
-    if (step === 0) {
-      h += '<div style="text-align:center">' + Art.eagle('happy', 0).replace('class="eagle"', 'class="eagle" style="width:170px"') + '<h1>أهلاً بك! أنا عُقاب</h1></div>' +
+  /* ---------- players ---------- */
+  who() {
+    const ps = Prof.list(); const fam = Dev.get().fam; const lg = ps.length > 1 ? App.league() : null;
+    let h = '<div style="padding-top:16px;text-align:center">' + Art.eagle('happy', 2, false, { cos: 'classic', col: 'blue' }).replace('class="eagle"', 'class="eagle" style="width:120px"') + '<h1 style="margin:0">' + (ps.length ? 'من سيلعب الآن؟' : 'أهلاً بك في عُقاب!') + '</h1></div>';
+    if (!fam) h += '<div class="card"><h3 style="margin-top:0">🔗 رمز الربط من أخيك الكبير</h3><p class="muted" style="margin:0 0 8px">اكتبه مرة واحدة على هذا الجهاز ليظهر حسابك وتقدّمك، ويتابعك أخوك.</p><div class="row" style="flex-wrap:nowrap"><input class="inp mono" id="wfam" dir="ltr" placeholder="XXXX-XXXX-XXXX"><button class="btn" id="wfb">ربط</button></div><p id="wfm" class="muted" style="font-size:.85em;margin:4px 0 0"></p></div>';
+    h += '<div class="players">' + ps.map(p => { const k = Kid.of(p.id); const D = App.derive(p.id); return '<div class="player" data-p="' + p.id + '" role="button" tabindex="0">' + Art.eagle('happy', D.rank, false, App.lookOf(k, false)) + '<b>' + esc(p.name) + (lg && lg.king === p.id ? ' 👑' : '') + '</b><small class="muted">' + esc(RANKS[D.rank].n) + '</small></div>'; }).join('') +
+      (Prof.freeId() && ps.length < 4 ? '<div class="player add" data-new="1" role="button" tabindex="0"><span style="font-size:40px">＋</span>لاعب جديد</div>' : '') + '</div>';
+    h += '<div class="sync" id="sync" style="justify-content:center"></div><p style="text-align:center;margin-top:24px"><a href="#/coach" class="muted" style="font-size:.85em">أنا المدرب (الأخ الأكبر)</a></p>';
+    return {
+      html: h, mount() {
+        $$('[data-p]').forEach(el => el.onclick = () => Views.login(el.dataset.p));
+        const n = $('[data-new]'); if (n) n.onclick = () => { App.np = { step: 0 }; App.go('newplayer'); };
+        const fb = $('#wfb'); if (fb) fb.onclick = async () => { fb.disabled = true; const ok = await Views.linkFamily($('#wfam').value, $('#wfm')); fb.disabled = false; if (ok) { toast('تم الربط ✅'); setTimeout(() => App.render(), 1500); App.render(); } };
+      }
+    };
+  },
+  login(pid) {
+    const p = Prof.one(pid); if (!p) return;
+    const m = modal('<div style="text-align:center">' + Art.eagle('think', App.derive(pid).rank, false, App.lookOf(Kid.of(pid), false)).replace('class="eagle"', 'class="eagle" style="width:90px"') + '<h2 style="margin:4px 0">أهلاً ' + esc(p.name) + '!</h2><p class="muted" style="margin:0">اكتب كلمة المرور الخاصة بك</p></div><form id="lgf"><input class="inp" id="lgp" type="password" autocomplete="off" style="margin:10px 0;text-align:center;font-size:1.3em"><p id="lgm" style="color:var(--bad);font-weight:800;min-height:1.4em;margin:0;text-align:center"></p><div class="row"><button class="btn" style="flex:1">دخول</button><button type="button" class="btn sec" data-close>رجوع</button></div></form><p class="muted" style="font-size:.8em;text-align:center">نسيتها؟ أخوك الكبير يستطيع تغييرها من لوحة المدرب.</p>');
+    const inp = $('#lgp', m.el); setTimeout(() => inp.focus(), 50);
+    $('#lgf', m.el).onsubmit = async e => {
+      e.preventDefault();
+      if ((App.lgBlock || 0) > now()) { $('#lgm', m.el).textContent = 'انتظر قليلاً ثم حاول مرة أخرى'; return; }
+      if (await Prof.check(pid, inp.value)) { m.close(); App.lgFails = 0; Kid.use(pid); Snd.win(); App.go(Kid.get().pledge ? 'map' : 'newplayer'); }
+      else { App.lgFails = (App.lgFails || 0) + 1; if (App.lgFails >= 5) { App.lgBlock = now() + 30000; App.lgFails = 0; } Snd.bad(); inp.value = ''; $('#lgm', m.el).textContent = 'كلمة المرور غير صحيحة'; inp.classList.add('wrong'); }
+    };
+  },
+  newplayer() {
+    const st = App.np || { step: Kid.pid() ? 2 : 0 }; App.np = st;
+    if (Kid.pid() && st.step < 2) st.step = 2;
+    let h = '<div style="padding-top:16px">';
+    if (st.step === 0) {
+      h += '<div style="text-align:center">' + Art.eagle('happy', 0, false, { cos: 'classic', col: 'blue' }).replace('class="eagle"', 'class="eagle" style="width:160px"') + '<h1>أهلاً بك! أنا عُقاب</h1></div>' +
         '<div class="card"><p>أنا عُقاب آلي، أحرس <b>عُشّ البيانات</b>.</p><p>العُقاب يرى من السماء ما لا يراه أحد. وأنا سأعلّمك أن ترى الحاسوب والإنترنت بعين العُقاب: كيف يعمل كل شيء من الداخل، وأين تختبئ الثغرات، وكيف نسدّها.</p><p>رحلتنا طويلة وممتعة. نبدأ من الصفر، خطوة خطوة، وكل درس لعبة تلعبها بنفسك.</p></div>' +
-        '<button class="btn wide" data-w="1">هيا نبدأ!</button><p style="text-align:center;margin-top:28px"><a href="#/coachsetup" class="muted" style="font-size:.85em">أنا المدرب (الأخ الأكبر)</a></p>';
-    } else if (step === 1) {
+        '<div class="row"><button class="btn" style="flex:1" data-n="1">هيا نبدأ!</button><a class="btn sec" href="#/who">رجوع</a></div>';
+    } else if (st.step === 1) {
+      h += '<div class="mentor">' + Art.eagle('think', 0) + '<div class="bubble">لنصنع حسابك. اختر اسمك، وكلمة مرور بسيطة تتذكّرها ولا تخبر بها أحداً غير أخيك الكبير.</div></div>' +
+        '<div class="card"><label><b>اسمك</b></label><input class="inp" id="npn" maxlength="16" placeholder="مثلاً: سيف"><label style="display:block;margin-top:10px"><b>كلمة المرور</b> <small class="muted">(4 أحرف أو أرقام على الأقل)</small></label><input class="inp" id="npp1" type="password" autocomplete="new-password"><input class="inp" id="npp2" type="password" autocomplete="new-password" placeholder="أعد كتابتها" style="margin-top:8px"><p id="npm" style="color:var(--bad);font-weight:800;min-height:1.4em;margin:6px 0 0"></p></div>' +
+        '<button class="btn wide" data-n="2">التالي</button>';
+    } else if (st.step === 2) {
+      const L = App.lookOf(Kid.get(), false);
+      h += '<div class="mentor">' + Art.eagle('happy', 0) + '<div class="bubble">اختر لوني ولون صفحتك! (تستطيع تغييرهما في أي وقت من «ملفي ← خزانتي»، وستفتح أزياء جديدة كلما ارتفعت رتبتك.)</div></div>' + Views.lookPickers(false, App.derive()) + '<button class="btn wide" data-n="3" style="margin-top:12px">التالي</button>';
+    } else {
       h += '<div class="mentor">' + Art.eagle('think', 0) + '<div class="bubble">قبل أن ندخل، هذا عهد بيني وبينك. اقرأه جيداً.</div></div>' +
         '<div class="card"><h2 style="text-align:center">عهد عُقاب</h2>' +
         '<div class="warn-card">كل ما أتعلّمه هنا أجرّبه <u>داخل عُقاب فقط</u>.<br>لا أجرّبه أبداً على أي موقع أو جهاز أو حساب حقيقي.</div>' +
@@ -273,30 +382,74 @@ const Views = {
         '<p>داخل عُقاب كل شيء وهمي وآمن: الطرفية، والشبكة، والمواقع. جرّب فيها ما تشاء.</p>' +
         '<p>وإذا رأيت شيئاً غريباً في موقع حقيقي، أخبر أخاك ولا تجرّب عليه شيئاً.</p>' +
         '<label class="row" style="margin-top:10px;font-weight:800;cursor:pointer"><input type="checkbox" id="agree" style="width:24px;height:24px"> قرأت العهد وأوافق عليه</label></div>' +
-        '<button class="btn wide" data-w="2" id="agreeBtn" disabled>أعاهدك يا عُقاب</button>';
-    } else {
-      h += '<div class="mentor">' + Art.eagle('happy', 0) + '<div class="bubble">ممتاز! بماذا أناديك؟ (اكتب اسمك أو لقبك)</div></div>' +
-        '<div class="card"><input class="inp" id="nm" maxlength="20" placeholder="مثلاً: البطل" value="' + esc(k.name || '') + '">' +
-        '<p class="muted" style="font-size:.9em;margin-top:12px">إذا أعطاك أخوك <b>رمز الربط</b>، اكتبه هنا ليتابع تقدّمك. يمكنك إضافته لاحقاً من «ملفي».</p>' +
-        '<input class="inp mono" id="fam" placeholder="XXXX-XXXX-XXXX" dir="ltr" value="' + esc(Dev.get().fam || '') + '"><p id="famMsg" class="muted" style="font-size:.85em"></p></div>' +
-        '<button class="btn wide" data-w="3">انطلق!</button>';
+        '<button class="btn wide" data-n="4" id="agreeBtn" disabled>أعاهدك يا عُقاب</button>';
     }
     h += '</div>';
     return {
       html: h, mount() {
-        $$('[data-w]').forEach(b => b.onclick = async () => {
-          const s = +b.dataset.w;
-          if (s === 3) {
-            const n = $('#nm').value.trim(); const f = $('#fam').value.trim();
-            if (f) { const ok = await Views.linkFamily(f, $('#famMsg')); if (!ok) return; }
-            if (n) Kid.setName(n);
-            Kid.pledge(); App.wstep = 0; Snd.win(); confetti(60); App.go('map'); return;
-          }
-          App.wstep = s; App.render();
-        });
+        Views.mountPickers(false);
         const ag = $('#agree'); if (ag) ag.onchange = () => { $('#agreeBtn').disabled = !ag.checked; };
+        $$('[data-n]').forEach(b => b.onclick = async () => {
+          const n = +b.dataset.n;
+          if (n === 2) {
+            const name = $('#npn').value.trim(), p1 = $('#npp1').value, p2 = $('#npp2').value, msg = $('#npm');
+            if (!name) { msg.textContent = 'اكتب اسمك'; return; }
+            if (Prof.list().some(p => p.name === name)) { msg.textContent = 'هذا الاسم موجود. اختر اسماً آخر'; return; }
+            if (String(p1).trim().length < 4) { msg.textContent = 'كلمة المرور قصيرة (4 على الأقل)'; return; }
+            if (p1 !== p2) { msg.textContent = 'الكلمتان غير متطابقتين'; return; }
+            b.disabled = true;
+            const first = !Prof.list().length;
+            const id = await Prof.create(name, p1);
+            if (!id) { msg.textContent = 'لا يوجد مكان لحساب جديد'; b.disabled = false; return; }
+            Kid.use(id); if (first) adoptLegacy(id, App.legacyRemote);
+            Kid.setName(name);
+          }
+          if (n === 4) { Kid.pledge(); App.np = null; Snd.win(); confetti(60); App.go('map'); return; }
+          st.step = n; App.render();
+        });
       }
     };
+  },
+  /* wardrobe pickers: stage 1 (day) or stage 2 (night) */
+  lookPickers(night, D) {
+    const s = night ? 's2' : 's1'; const cat = Art.LOOKS[s]; const L = App.lookOf(Kid.get(), night);
+    let h = '<div class="card"><h3 style="margin-top:0">' + (night ? '🌙 زيّ عُقاب الليلي' : '🦅 زيّ عُقاب') + '</h3><div class="picks">' + cat.cos.map(c => { const open = App.lookOpen(c[2], D); return '<button class="pick' + (L.cos === c[0] ? ' on' : '') + (open ? '' : ' lock') + '" data-lk="' + s + '" data-k="cos" data-v="' + c[0] + '" data-open="' + (open ? 1 : 0) + '" data-req="' + esc(Views.reqText(c[2])) + '">' + (open ? '' : '<span class="lk">🔒</span>') + Art.eagle('happy', 3, night, { cos: c[0], col: L.col }) + '<br>' + c[1] + '</button>'; }).join('') + '</div>';
+    h += '<h3>🎨 لون الريش</h3><div class="picks">' + cat.col.map(c => '<button class="pick' + (L.col === c ? ' on' : '') + '" data-lk="' + s + '" data-k="col" data-v="' + c + '" data-open="1"><span class="dot" style="background:linear-gradient(135deg,' + Art.COLORS[c][1] + ' 50%,' + Art.COLORS[c][0] + ' 50%)"></span><br>' + Art.COLORS[c][2] + '</button>').join('') + '</div>';
+    const TH = { sky: ['#EAF1FB', '#1E4FA6', '#F2A51A'], forest: ['#EAF6EE', '#1E7A4A', '#F2A51A'], sunset: ['#FFF1E8', '#C2410C', '#F2A51A'], candy: ['#FBEFFB', '#9D2FA8', '#F2A51A'], desert: ['#FBF5E6', '#8A5A00', '#14A37F'], neon: ['#0A0F1F', '#2BD67B', '#FFC53D'], synth: ['#140A22', '#F04CC8', '#7CF0C0'], ice: ['#06141F', '#2BC8F0', '#FFC53D'], ember: ['#1A0A08', '#FF7A3D', '#FFC53D'] };
+    h += '<h3>🖌️ ألوان الصفحة</h3><div class="picks">' + cat.th.map(t => '<button class="pick' + (L.th === t[0] ? ' on' : '') + '" data-lk="' + s + '" data-k="th" data-v="' + t[0] + '" data-open="1"><span class="sw">' + TH[t[0]].map(c => '<i style="background:' + c + '"></i>').join('') + '</span>' + t[1] + '</button>').join('') + '</div></div>';
+    return h;
+  },
+  reqText(r) { if (!r) return ''; if (r.rank != null) return 'يُفتح عند رتبة «' + RANKS[r.rank].n + '»'; if (r.crown) return 'يُفتح عندما تصبح بطل الأسبوع 👑'; if (r.flags) return 'يُفتح بعد ' + r.flags + ' أعلام'; return ''; },
+  mountPickers() {
+    $$('.pick[data-lk]').forEach(b => b.onclick = () => {
+      if (b.dataset.open !== '1') { Snd.bad(); toast('🔒 ' + b.dataset.req); return; }
+      const s = b.dataset.lk; const cur = Object.assign({}, (Kid.get().look || {})[s] || {}); cur[b.dataset.k] = b.dataset.v;
+      Kid.setLook({ [s]: cur }); Snd.ok(); App.render();
+    });
+  },
+  look(r, D) {
+    let h = '<div class="row" style="margin:6px 0"><a class="btn sm sec" href="#/me">' + ic('back', 18) + 'ملفي</a></div><h1>👕 خزانتي</h1><p class="muted">اختر شكل عُقاب وألوانه، وألوان صفحتك. أزياء جديدة تُفتح كلما تقدّمت.</p>';
+    h += '<div style="text-align:center">' + Art.eagle('happy', D.rank, false).replace('class="eagle"', 'class="eagle" style="width:120px"') + (D.stage2 ? Art.eagle('happy', D.rank, true).replace('class="eagle"', 'class="eagle" style="width:120px"') : '') + '</div>';
+    h += Views.lookPickers(false, D);
+    h += D.stage2 ? Views.lookPickers(true, D) : '<div class="card" style="opacity:.7"><h3 style="margin-top:0">🌙 الخزانة الليلية</h3><p class="muted" style="margin:0">أزياء وألوان خاصة بالمرحلة الثانية (النينجا، صاحب القلنسوة، السايبورغ، الظل...). تُفتح مع صيد الأعلام.</p></div>';
+    return { html: h, mount() { Views.mountPickers(); } };
+  },
+  /* ---------- family league ---------- */
+  league(r, D) {
+    const lg = App.league(); if (lg.ps.length < 2) { setTimeout(() => App.go('map')); return {}; }
+    const rows = lg.ps.map(p => { const d = App.derive(p.id); return { p, d, w: lg.thisWeek[p.id] || 0, k: Kid.of(p.id) }; }).sort((a, b) => b.w - a.w);
+    const max = Math.max(50, ...rows.map(x => x.w));
+    const ws = new Date(lg.cur), we = new Date(lg.cur + 6 * 864e5);
+    let h = '<h1>🏆 لوحة الأبطال</h1><p class="muted">سباق هذا الأسبوع (' + ws.getDate() + ' ' + MONTHS[ws.getMonth()] + ' ← ' + we.getDate() + ' ' + MONTHS[we.getMonth()] + '). من يجمع أكثر نقاط حتى نهاية الجمعة يلبس <b>التاج 👑</b> طوال الأسبوع القادم!</p>';
+    h += '<div class="card">' + rows.map((x, i) => '<div class="league-row">' + '<b style="font-size:1.4em;width:28px;text-align:center">' + (i === 0 && x.w ? '🥇' : i === 1 && x.w ? '🥈' : (i + 1)) + '</b>' + Art.eagle('happy', x.d.rank, false, App.lookOf(x.k, false)) + '<div style="flex:1"><b>' + esc(x.p.name) + (lg.king === x.p.id ? ' <span class="crown">👑</span>' : '') + (x.p.id === Kid.pid() ? ' <small class="muted">(أنت)</small>' : '') + '</b><div class="bar"><i style="width:' + Math.round(x.w / max * 100) + '%"></i></div><small class="muted"><bdi>' + x.w + ' XP</bdi> هذا الأسبوع</small></div></div>').join('') + '</div>';
+    const gp = Math.min(100, Math.round(lg.sumNow / lg.goal * 100));
+    h += '<div class="card" style="border-color:var(--gold)"><h3 style="margin-top:0">🤝 هدف الإخوة المشترك</h3><p style="margin:0">اجمعوا معاً <b><bdi>' + lg.goal + ' XP</bdi></b> هذا الأسبوع، فيحصل <b>كل من شارك</b> على <b>+30 XP</b> هدية!</p><div class="bar" style="height:18px;margin-top:8px"><i style="width:' + gp + '%"></i></div><small class="muted"><bdi>' + lg.sumNow + ' / ' + lg.goal + '</bdi> ' + (lg.sumNow >= lg.goal ? '✅ تحقّق الهدف!' : '') + '</small></div>';
+    h += '<div class="sec-h"><h2>المقارنة الكاملة</h2></div><table class="t"><thead><tr><th></th>' + rows.map(x => '<th>' + esc(x.p.name) + '</th>').join('') + '</tr></thead><tbody>' +
+      [['⭐ مجموع النقاط', x => x.d.xp], ['🎩 الرتبة', x => RANKS[x.d.rank].n], ['🔥 السلسلة', x => x.d.streak], ['📘 الدروس', x => Object.keys(x.d.lessonsDone).length], ['🎖️ الميداليات', x => Object.keys(x.k.M).filter(m => MEDALS[m]).length], ['🚩 الأعلام', x => x.d.solved.length], ['👑 التيجان', x => lg.crowns[x.p.id] || 0]].map(rw => '<tr><td>' + rw[0] + '</td>' + rows.map(x => '<td><b>' + rw[1](x) + '</b></td>').join('') + '</tr>').join('') + '</tbody></table>';
+    const ev = []; lg.ps.forEach(p => Object.values(Kid.of(p.id).E).forEach(e => { if (['lesson', 'medal', 'ctf', 'test'].includes(e.k) && (e.k !== 'test' || e.ok)) ev.push([e, p]); }));
+    ev.sort((a, b) => b[0].t - a[0].t);
+    h += '<div class="sec-h"><h2>آخر الإنجازات</h2></div><div class="card feed">' + (ev.slice(0, 10).map(([e, p]) => '<div><b>' + esc(p.name) + '</b> ' + (e.k === 'lesson' ? 'أنهى درس «' + esc(e.n || '') + '» 📘' : e.k === 'medal' ? 'ربح ميدالية «' + esc((MEDALS[e.id] || {}).n || '') + '» 🎖️' : e.k === 'ctf' ? 'التقط علم «' + esc((C.ctf.find(c => c.id === e.id) || {}).title || '') + '» 🚩' : 'أتقن وحدة «' + esc((unitById(e.id) || {}).title || '') + '» 🏅') + ' <small class="muted">' + fmtDay(dayKey(e.t)) + '</small></div>').join('') || '<p class="muted" style="margin:0">لا إنجازات بعد. من سيبدأ أولاً؟</p>') + '</div>';
+    return { html: h };
   },
   normFam(f) { const x = f.toUpperCase().replace(/[^A-Z0-9]/g, ''); return x.length === 12 ? x.slice(0, 4) + '-' + x.slice(4, 8) + '-' + x.slice(8) : null; },
   async linkFamily(f, msgEl) {
@@ -305,13 +458,17 @@ const Views = {
     if (Dev.get().fam === code) return true;
     Dev.set('fam', code);
     if (Sync.has()) {
-      try { const r = await Sync.fetchOnce(code); if (r && r.coach) Coach.replace(mergeCoach(r.coach, emptyCoach())); if (r && r.kid) Kid.mergeIn(r.kid); } catch (e) { }
+      if (msgEl) { msgEl.textContent = 'جارٍ التحميل...'; msgEl.style.color = ''; }
+      try {
+        const r = await Sync.fetchAll(code);
+        if (r) { if (r.coach) Coach.replace(mergeCoach(r.coach, emptyCoach())); if (r.p) Prof.mergeIn(r.p); PIDS.forEach(id => { if (r[id]) Kid.mergeInto(id, r[id]); }); App.legacyRemote = r.kid; }
+      } catch (e) { }
       Sync.start();
     }
     return true;
   },
   linkDialog() {
-    const m = modal('<h2>رمز الربط</h2><p class="muted">اكتب الرمز الذي أعطاك إياه أخوك ليتابع تقدّمك من جهازه.</p><input class="inp mono" id="fam2" dir="ltr" placeholder="XXXX-XXXX-XXXX" value="' + esc(Dev.get().fam || '') + '"><p id="fm2" class="muted"></p><div class="row"><button class="btn" id="fsv">حفظ</button><button class="btn sec" data-close>إلغاء</button></div>');
+    const m = modal('<h2>رمز الربط</h2><p class="muted">اكتب الرمز الذي أعطاك إياه أخوك الكبير.</p><input class="inp mono" id="fam2" dir="ltr" placeholder="XXXX-XXXX-XXXX" value="' + esc(Dev.get().fam || '') + '"><p id="fm2" class="muted"></p><div class="row"><button class="btn" id="fsv">حفظ</button><button class="btn sec" data-close>إلغاء</button></div>');
     $('#fsv', m.el).onclick = async () => { const ok = await Views.linkFamily($('#fam2', m.el).value, $('#fm2', m.el)); if (ok) { m.close(); toast('تم الربط ✅'); App.render(); } };
   },
 
@@ -380,12 +537,12 @@ const Views = {
     for (let i = 13; i >= 0; i--) { const dk = addDays(dayKey(), -i); h += '<span class="' + (D.active[dk] ? 'on' : '') + '" title="' + fmtDay(dk) + '">' + dk.slice(8) + '</span>'; }
     h += '</div></div>';
     const c = Coach.get();
-    if (c.wk && c.wk.title) {
+    if (c.wk && c.wk.title && (!c.wk.to || c.wk.to === '*' || c.wk.to === Kid.pid())) {
       const w = k.W[c.wk.id];
       h += '<div class="card" style="border-color:var(--gold)"><h3 style="margin-top:0">🏆 تحدّي الأسبوع من أخيك</h3><b>' + esc(c.wk.title) + '</b><p style="white-space:pre-wrap">' + esc(c.wk.body || '') + '</p>' + (w ? '<p class="pill ok">✅ أرسلت إجابتك</p>' : '<a class="btn gold" href="#/weekly">حلّ التحدي</a>') + '</div>';
     }
-    const msgs = Object.entries(c.msgs || {}).sort((a, b) => b[1].t - a[1].t).slice(0, 5);
-    if (msgs.length) h += '<div class="sec-h"><h2>رسائل أخيك</h2></div>' + msgs.map(([id, m]) => '<div class="card" style="padding:10px 14px"><small class="muted">' + fmtDay(dayKey(m.t)) + '</small><p style="margin:0;white-space:pre-wrap">' + esc(m.x) + '</p></div>').join('');
+    const msgs = Object.entries(c.msgs || {}).filter(([id, m]) => !m.to || m.to === '*' || m.to === Kid.pid()).sort((a, b) => b[1].t - a[1].t).slice(0, 5);
+    if (msgs.length) h += '<div class="sec-h"><h2>رسائل أخيك الكبير</h2></div>' + msgs.map(([id, m]) => '<div class="card" style="padding:10px 14px"><small class="muted">' + fmtDay(dayKey(m.t)) + '</small><p style="margin:0;white-space:pre-wrap">' + esc(m.x) + '</p></div>').join('');
     return { html: h };
   },
   nextLesson(D) {
@@ -411,14 +568,15 @@ const Views = {
 
   glossary() {
     const k = Kid.get(); const ids = Object.keys(C.terms).filter(id => k.G[id]).sort((a, b) => C.terms[a].ar.localeCompare(C.terms[b].ar, 'ar'));
-    let h = '<h1>📖 قاموسي</h1><p class="muted">كل كلمة تقابلها في الدروس تُضاف هنا تلقائياً. عندك الآن <b>' + ids.length + '</b> من ' + Object.keys(C.terms).length + ' كلمة.</p><input class="inp" id="gq" placeholder="ابحث عن كلمة...">';
+    let h = '<div class="row" style="margin:6px 0"><a class="btn sm sec" href="#/me">' + ic('back', 18) + 'ملفي</a></div><h1>📖 قاموسي</h1><p class="muted">كل كلمة تقابلها في الدروس تُضاف هنا تلقائياً. عندك الآن <b>' + ids.length + '</b> من ' + Object.keys(C.terms).length + ' كلمة.</p><input class="inp" id="gq" placeholder="ابحث عن كلمة...">';
     h += '<div id="gl">' + (ids.length ? ids.map(id => { const t = C.terms[id]; return '<div class="gl-item" data-s="' + esc((t.ar + ' ' + (t.en || '')).toLowerCase()) + '"><b>' + esc(t.ar) + '</b> ' + (t.en ? '<span class="en">' + esc(t.en) + '</span>' : '') + '<div>' + md(t.d) + '</div></div>'; }).join('') : '<div class="card" style="text-align:center">القاموس فارغ الآن. ابدأ أول درس وستمتلئ هذه الصفحة بالكلمات!</div>') + '</div>';
     return { html: h, mount() { const q = $('#gq'); if (q) q.oninput = () => { const v = q.value.trim().toLowerCase(); $$('.gl-item').forEach(e => e.style.display = !v || e.dataset.s.includes(v) ? '' : 'none'); }; } };
   },
 
   me(r, D) {
     const k = Kid.get(); const ri = App.rankInfo(D.xp); const d = Dev.get();
-    let h = '<div class="card hatbox">' + Art.hat(ri.i) + '<h1 style="margin:0">' + esc(k.name || 'البطل') + '</h1><p style="margin:0"><b>' + esc(ri.cur.n) + '</b> · <bdi>' + D.xp + ' XP</bdi></p><div class="bar" style="width:100%;max-width:340px"><i style="width:' + ri.pct + '%"></i></div><small class="muted">' + (ri.next ? 'باقي <bdi>' + (ri.next.x - D.xp) + ' XP</bdi> على «' + esc(ri.next.n) + '»' : 'وصلت لأعلى رتبة!') + '</small></div>';
+    let h = '<div class="card hatbox">' + Art.hat(ri.i) + '<h1 style="margin:0">' + esc(k.name || 'البطل') + (D.king ? ' 👑' : '') + '</h1><p style="margin:0"><b>' + esc(ri.cur.n) + '</b> · <bdi>' + D.xp + ' XP</bdi></p><div class="bar" style="width:100%;max-width:340px"><i style="width:' + ri.pct + '%"></i></div><small class="muted">' + (ri.next ? 'باقي <bdi>' + (ri.next.x - D.xp) + ' XP</bdi> على «' + esc(ri.next.n) + '»' : 'وصلت لأعلى رتبة!') + '</small></div>';
+    h += '<div class="grid2"><a class="btn gold" href="#/look">👕 خزانتي (الأشكال والألوان)</a><a class="btn sec" href="#/glossary">' + ic('book', 20) + 'قاموسي</a></div>';
     h += '<div class="sec-h"><h2>الرتب</h2></div><div class="ranks">' + RANKS.map((x, i) => '<div class="rk ' + (i === ri.i ? 'cur' : i > ri.i ? 'no' : '') + '">' + (i <= ri.i ? '🎩' : '🔒') + ' ' + esc(x.n) + '<span class="sp" style="flex:1"></span><small>' + x.x + ' XP</small></div>').join('') + '</div>';
     h += '<div class="sec-h"><h2>الميداليات</h2><small class="muted">' + Object.keys(k.M).filter(m => MEDALS[m]).length + ' من ' + Object.keys(MEDALS).length + '</small></div>';
     for (const dm in DOMAINS) {

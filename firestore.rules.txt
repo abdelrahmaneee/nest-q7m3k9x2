@@ -5,7 +5,7 @@ service cloud.firestore {
       allow get: if request.auth != null && fam.size() == 14;
       allow create, update: if request.auth != null
         && fam.size() == 14
-        && doc in ['kid', 'coach']
+        && (doc in ['kid', 'coach', 'p'] || doc.matches('k[1-4]'))
         && request.resource.data.keys().hasOnly(['j', 'u'])
         && request.resource.data.j is string
         && request.resource.data.j.size() < 900000;

@@ -45,12 +45,19 @@ const CoachUI = {
   },
 
   view(r, D) {
-    const d = Dev.get(), c = Coach.get();
-    const isCoachDev = d.role === 'coach';
-    if (!CoachUI.open && !(isCoachDev && d.coachUntil > now())) return CoachUI.pinScreen(!c.pin);
-    const tabs = [['day', 'الأيام'], ['prog', 'التقدّم'], ['ctl', 'التحكّم'], ['msg', 'الرسائل والتحدي'], ['data', 'البيانات']];
-    let h = '<div class="row" style="justify-content:space-between"><h1 style="margin:0">لوحة المدرب</h1><button class="btn sm sec" id="clk">' + ic('lock', 18) + 'قفل</button></div>';
+    const c = Coach.get();
+    if (!CoachUI.open) return CoachUI.pinScreen(!c.pin);
+    const ps = Prof.list();
+    if (!CoachUI.sel || (CoachUI.sel !== '*' && !Prof.one(CoachUI.sel))) CoachUI.sel = ps[0] ? ps[0].id : null;
+    const tabs = [['day', 'الأيام'], ['prog', 'التقدّم'], ['ctl', 'التحكّم'], ['msg', 'الرسائل والتحدي'], ['ply', 'اللاعبون'], ['data', 'البيانات']];
+    let h = '<div class="row" style="justify-content:space-between;margin-top:10px"><h1 style="margin:0">لوحة المدرب</h1><button class="btn sm sec" id="clk">' + ic('lock', 18) + 'قفل</button></div><p class="muted" style="margin:0;font-size:.85em">تُقفل وحدها عند الخروج منها أو بعد 3 دقائق بلا نشاط.</p>';
     h += '<div class="ctabs">' + tabs.map(t => '<button data-ct="' + t[0] + '" aria-pressed="' + (CoachUI.tab === t[0]) + '">' + t[1] + '</button>').join('') + '</div>';
+    if (['day', 'prog', 'ctl'].includes(CoachUI.tab)) {
+      if (!ps.length) return { html: h + '<div class="card">لا يوجد لاعبون بعد. أضف أخويك من تبويب «اللاعبون»، أو يضيف كل واحد منهما حسابه من جهازه.</div>', mount: CoachUI.mount };
+      const opts = (CoachUI.tab === 'ctl' ? [['*', 'الجميع']] : []).concat(ps.map(p => [p.id, p.name]));
+      if (CoachUI.tab !== 'ctl' && CoachUI.sel === '*') CoachUI.sel = ps[0].id;
+      h += '<div class="ctabs" style="margin-top:0">' + opts.map(o => '<button data-ks="' + o[0] + '" aria-pressed="' + (CoachUI.sel === o[0]) + '" style="border-style:dashed">' + (o[0] === '*' ? '👥 ' : '🧒 ') + esc(o[1]) + '</button>').join('') + '</div>';
+    }
     h += CoachUI['t_' + CoachUI.tab](D);
     return { html: h, mount: CoachUI.mount };
   },
@@ -63,14 +70,15 @@ const CoachUI = {
       html: '<div class="pin">' + ic('lock', 44) + '<h2>أدخل رمز المدرب</h2><div class="dots" id="pdots">' + '<i></i>'.repeat(4) + '</div><div class="keys">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => '<button data-n="' + n + '">' + n + '</button>').join('') + '<button data-n="x" aria-label="مسح">⌫</button><button data-n="0">0</button><button data-n="ok" aria-label="دخول">✓</button></div><p id="pm" class="muted"></p></div>',
       mount() {
         const paint = () => { $('#pdots').innerHTML = Array.from({ length: Math.max(4, st.pin.length) }, (_, i) => '<i class="' + (i < st.pin.length ? 'on' : '') + '"></i>').join(''); };
-        const tryIt = async () => { if (await CoachUI.checkPin(st.pin)) { CoachUI.open = true; if (Dev.get().role === 'coach') Dev.set('coachUntil', now() + 30 * 864e5); Snd.ok(); App.render(); } else if (st.pin.length >= 4) { $('#pm').textContent = 'الرمز غير صحيح'; Snd.bad(); st.pin = ''; paint(); } };
+        const tryIt = async () => { if (await CoachUI.checkPin(st.pin)) { CoachUI.open = true; App.lastAct = now(); Snd.ok(); App.render(); } else if (st.pin.length >= 4) { $('#pm').textContent = 'الرمز غير صحيح'; Snd.bad(); st.pin = ''; paint(); } };
         $('.keys').onclick = e => { const b = e.target.closest('[data-n]'); if (!b) return; const n = b.dataset.n; if (n === 'x') st.pin = st.pin.slice(0, -1); else if (n === 'ok') { tryIt(); return; } else if (st.pin.length < 8) st.pin += n; paint(); if (st.pin.length >= 4) tryIt(); };
       }
     };
   },
   mount() {
     $$('[data-ct]').forEach(b => b.onclick = () => { CoachUI.tab = b.dataset.ct; App.render(); });
-    $('#clk').onclick = () => { CoachUI.open = false; Dev.set('coachUntil', 0); App.go(Dev.get().role === 'coach' ? 'coach' : 'map'); };
+    $$('[data-ks]').forEach(b => b.onclick = () => { CoachUI.sel = b.dataset.ks; CoachUI.day = null; App.render(); });
+    $('#clk').onclick = () => { CoachUI.open = false; App.go(Dev.get().role === 'coach' ? 'coach' : 'who'); App.render(); };
     const m = CoachUI['m_' + CoachUI.tab]; if (m) m();
   },
 
@@ -85,7 +93,7 @@ const CoachUI = {
   unitTitle(id) { const U = unitById(id); return U ? U.title : id; },
 
   t_day(D) {
-    const k = Kid.get();
+    const k = Kid.of(CoachUI.sel); D = App.derive(CoachUI.sel);
     const days = uniq(Object.keys(k.D).concat(Object.values(k.E).map(e => dayKey(e.t)))).sort().reverse();
     const day = CoachUI.day || days[0] || dayKey();
     const S = CoachUI.dayStats(k, day);
@@ -118,7 +126,7 @@ const CoachUI = {
   m_day() { const s = $('#cday'); if (s) s.onchange = () => { CoachUI.day = s.value; App.render(); }; },
 
   t_prog(D) {
-    const k = Kid.get();
+    const k = Kid.of(CoachUI.sel); D = App.derive(CoachUI.sel);
     let h = '<table class="t"><thead><tr><th>الوحدة</th><th>الدروس</th><th>الاختبار</th><th>صعوبة</th></tr></thead><tbody>';
     const weak = {};
     C.units.concat(C.final ? [C.final] : []).forEach(u => {
@@ -139,38 +147,61 @@ const CoachUI = {
   },
 
   t_ctl(D) {
-    const c = Coach.get();
-    const opt = (id, cur) => '<select class="inp" data-u="' + id + '" style="width:auto;padding:4px 8px">' + [['', 'تلقائي'], ['open', 'مفتوحة'], ['lock', 'مقفلة']].map(o => '<option value="' + o[0] + '"' + ((cur || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
-    let h = '<p class="muted">«تلقائي» = تُفتح عندما ينجح في اختبار الوحدة السابقة بـ 80%.</p><table class="t"><tbody>';
-    C.units.forEach(u => { h += '<tr><td>' + u.icon + ' ' + esc(u.title) + '</td><td>' + (D.st[u.id].open ? '🔓' : '🔒') + '</td><td>' + opt(u.id, c.U[u.id] && c.U[u.id].m) + '</td></tr>'; });
-    if (C.final) h += '<tr><td>⭐ ' + esc(C.final.title) + '</td><td>' + (D.st.final.open ? '🔓' : '🔒') + '</td><td>' + opt('final', c.U.final && c.U.final.m) + '</td></tr>';
-    h += '<tr><td>🚩 المرحلة الثانية (الأعلام)</td><td>' + (D.stage2 ? '🔓' : '🔒') + '</td><td><select class="inp" id="cs2" style="width:auto;padding:4px 8px">' + [['', 'تلقائي'], ['open', 'مفتوحة'], ['lock', 'مقفلة']].map(o => '<option value="' + o[0] + '"' + (((c.ctfU && c.ctfU.m) || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></td></tr>';
-    h += '</tbody></table>';
-    h += '<div class="card"><h3 style="margin-top:0">معاينة</h3><p class="muted">تصفّح التطبيق كما يراه أخوك، دون أن يُسجَّل شيء.</p><button class="btn sec" id="cprev">' + ic('eye', 20) + 'معاينة كأخي</button> <button class="btn sec" id="cpg">🎁 معاينة هدية الرتبة</button> <button class="btn sec" id="cps2">🌙 معاينة دخول المرحلة الثانية</button></div>';
+    const c = Coach.get(); const sc = CoachUI.sel; const one = sc !== '*';
+    if (one) D = App.derive(sc);
+    const cur = (uid) => { const x = c.U[sc] && c.U[sc][uid]; return x ? x.m : ''; };
+    const opt = (id, v) => '<select class="inp" data-u="' + id + '" style="width:auto;padding:4px 8px">' + [['', one ? 'حسب «الجميع» / تلقائي' : 'تلقائي'], ['open', 'مفتوحة'], ['lock', 'مقفلة']].map(o => '<option value="' + o[0] + '"' + ((v || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
+    let h = '<p class="muted">«تلقائي» = تُفتح عندما ينجح في اختبار الوحدة السابقة بـ 80%. إعداد اللاعب الواحد يغلب إعداد «الجميع» إذا كان أحدث.</p><table class="t"><tbody>';
+    C.units.forEach(u => { h += '<tr><td>' + u.icon + ' ' + esc(u.title) + '</td><td>' + (one ? (D.st[u.id].open ? '🔓' : '🔒') : '') + '</td><td>' + opt(u.id, cur(u.id)) + '</td></tr>'; });
+    if (C.final) h += '<tr><td>⭐ ' + esc(C.final.title) + '</td><td>' + (one ? (D.st.final.open ? '🔓' : '🔒') : '') + '</td><td>' + opt('final', cur('final')) + '</td></tr>';
+    const s2 = c.ctfU[sc] ? c.ctfU[sc].m : '';
+    h += '<tr><td>🚩 المرحلة الثانية (الأعلام)</td><td>' + (one ? (D.stage2 ? '🔓' : '🔒') : '') + '</td><td><select class="inp" id="cs2" style="width:auto;padding:4px 8px">' + [['', one ? 'حسب «الجميع» / تلقائي' : 'تلقائي'], ['open', 'مفتوحة'], ['lock', 'مقفلة']].map(o => '<option value="' + o[0] + '"' + (s2 === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></td></tr></tbody></table>';
+    h += '<div class="card"><h3 style="margin-top:0">معاينة</h3><p class="muted">تصفّح التطبيق كما يراه ' + (one ? esc(Prof.one(sc).name) : 'أخوك') + '، دون أن يُسجَّل شيء.</p>' + (one ? '<button class="btn sec" id="cprev">' + ic('eye', 20) + 'معاينة كـ' + esc(Prof.one(sc).name) + '</button> ' : '') + '<button class="btn sec" id="cpg">🎁 هدية الرتبة</button> <button class="btn sec" id="cpc">👑 تاج بطل الأسبوع</button> <button class="btn sec" id="cps2">🌙 دخول المرحلة الثانية</button></div>';
     return h;
   },
   m_ctl() {
-    $$('[data-u]').forEach(s => s.onchange = () => { const c = Coach.get(); c.U[s.dataset.u] = { m: s.value, u: now() }; Coach.save(); toast('تم الحفظ ✅'); App.render(); });
-    $('#cs2').onchange = e => { const c = Coach.get(); c.ctfU = { m: e.target.value, u: now() }; Coach.save(); toast('تم الحفظ ✅'); App.render(); };
-    $('#cprev').onclick = () => { App.preview = true; App.go('map'); };
-    $('#cpg').onclick = () => { const s = Dev.get().seen; const keep = s ? JSON.stringify(s) : null; App.showCele(['rank', Math.min(6, App.derive().rank + 1)]); const fix = setInterval(() => { if (!App.celeOn) { clearInterval(fix); const d = Dev.get(); d.seen = keep ? JSON.parse(keep) : null; Dev.save(); App.render(); } }, 300); };
-    $('#cps2').onclick = () => { const s = Dev.get().seen; const keep = s ? JSON.stringify(s) : null; App.showCele(['stage2']); const fix = setInterval(() => { if (!App.celeOn) { clearInterval(fix); const d = Dev.get(); d.seen = keep ? JSON.parse(keep) : null; Dev.save(); delete document.documentElement.dataset.stage; App.go('coach'); } }, 300); };
+    const sc = CoachUI.sel;
+    $$('[data-u]').forEach(s => s.onchange = () => { const c = Coach.get(); c.U[sc] = c.U[sc] || {}; c.U[sc][s.dataset.u] = { m: s.value, u: now() }; Coach.save(); toast('تم الحفظ ✅'); App.render(); });
+    $('#cs2').onchange = e => { const c = Coach.get(); c.ctfU[sc] = { m: e.target.value, u: now() }; Coach.save(); toast('تم الحفظ ✅'); App.render(); };
+    const pv = $('#cprev'); if (pv) pv.onclick = () => App.startPreview(sc);
+    $('#cpg').onclick = () => App.showCele(['rank', 3], true);
+    $('#cpc').onclick = () => App.showCele(['crown', 1], true);
+    $('#cps2').onclick = () => App.showCele(['stage2'], true);
   },
 
   t_msg() {
-    const c = Coach.get(), k = Kid.get();
-    let h = '<div class="card"><h3 style="margin-top:0">💬 رسالة تشجيع</h3><p class="muted">تظهر له كنافذة عندما يفتح التطبيق.</p><textarea class="inp" id="cmx" rows="3" placeholder="مثلاً: فخور بك يا بطل! أكمل هكذا 💪"></textarea><button class="btn" id="cms" style="margin-top:8px">أرسل</button></div>';
+    const c = Coach.get(); const ps = Prof.list();
+    const tgt = id => '<select class="inp" id="' + id + '" style="width:auto;padding:4px 8px"><option value="*">للجميع 👥</option>' + ps.map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join('') + '</select>';
+    const nm = to => !to || to === '*' ? 'الجميع' : ((Prof.one(to) || {}).name || '?');
+    let h = '<div class="card"><h3 style="margin-top:0">💬 رسالة تشجيع</h3><p class="muted">تظهر كنافذة عندما يفتح التطبيق.</p><textarea class="inp" id="cmx" rows="3" placeholder="مثلاً: فخور بك يا بطل! أكمل هكذا 💪"></textarea><div class="row" style="margin-top:8px"><span>إلى:</span>' + tgt('cmto') + '<button class="btn" id="cms">أرسل</button></div></div>';
     const ms = Object.entries(c.msgs || {}).sort((a, b) => b[1].t - a[1].t);
-    if (ms.length) h += '<table class="t"><tbody>' + ms.slice(0, 15).map(([id, m]) => '<tr><td class="mono" style="white-space:nowrap">' + fmtDay(dayKey(m.t)) + '</td><td style="white-space:pre-wrap">' + esc(m.x) + '</td><td>' + (k.MR[id] ? '<span class="pill ok">قرأها</span>' : '<span class="pill">لم تُقرأ</span>') + '</td></tr>').join('') + '</tbody></table>';
-    h += '<div class="card"><h3 style="margin-top:0">🏆 تحدّي الأسبوع</h3><p class="muted">اكتب تحدياً خاصاً، مثل: «اكتب برنامج Python يطبع جدول الضرب للرقم 7» أو «اشرح لي بصوتك كيف يعمل DNS».</p><input class="inp" id="cwt" placeholder="العنوان" value="' + esc(c.wk ? c.wk.title : '') + '"><textarea class="inp" id="cwb" rows="4" style="margin-top:8px" placeholder="التفاصيل">' + esc(c.wk ? c.wk.body : '') + '</textarea><div class="row" style="margin-top:8px"><button class="btn gold" id="cwn">نشر كتحدٍّ جديد</button>' + (c.wk ? '<button class="btn sec" id="cwx">إخفاء التحدي</button>' : '') + '</div></div>';
+    if (ms.length) h += '<table class="t"><tbody>' + ms.slice(0, 15).map(([id, m]) => { const rcpt = (m.to && m.to !== '*' ? [Prof.one(m.to) && Object.assign({ id: m.to }, Prof.one(m.to))].filter(Boolean) : ps); return '<tr><td class="mono" style="white-space:nowrap">' + fmtDay(dayKey(m.t)) + '<br><small>إلى: ' + esc(nm(m.to)) + '</small></td><td style="white-space:pre-wrap">' + esc(m.x) + '</td><td>' + rcpt.map(p => '<span class="pill ' + (Kid.of(p.id).MR[id] ? 'ok' : '') + '">' + esc(p.name) + (Kid.of(p.id).MR[id] ? ' ✓' : '') + '</span>').join(' ') + '</td></tr>'; }).join('') + '</tbody></table>';
+    h += '<div class="card"><h3 style="margin-top:0">🏆 تحدّي الأسبوع</h3><p class="muted">اكتب تحدياً خاصاً، مثل: «اكتب برنامج Python يطبع جدول الضرب للرقم 7» أو «اشرح لي بصوتك كيف يعمل DNS».</p><input class="inp" id="cwt" placeholder="العنوان" value="' + esc(c.wk ? c.wk.title : '') + '"><textarea class="inp" id="cwb" rows="4" style="margin-top:8px" placeholder="التفاصيل">' + esc(c.wk ? c.wk.body : '') + '</textarea><div class="row" style="margin-top:8px"><span>إلى:</span>' + tgt('cwto') + '<button class="btn gold" id="cwn">نشر كتحدٍّ جديد</button>' + (c.wk && c.wk.title ? '<button class="btn sec" id="cwx">إخفاء التحدي</button>' : '') + '</div></div>';
     const hist = Object.values(c.wkh || {}).sort((a, b) => b.u - a.u);
-    if (hist.length) h += '<div class="sec-h"><h2>الإجابات</h2></div>' + hist.slice(0, 10).map(w => { const a = k.W[w.id]; return '<div class="card"><b>' + esc(w.title) + '</b> <small class="muted">' + fmtDay(dayKey(w.u)) + '</small><p style="white-space:pre-wrap;margin:6px 0">' + (a ? '✅ ' + esc(a.ans) : '<span class="muted">لم يجب بعد</span>') + '</p></div>'; }).join('');
+    if (hist.length) h += '<div class="sec-h"><h2>الإجابات</h2></div>' + hist.slice(0, 10).map(w => '<div class="card"><b>' + esc(w.title) + '</b> <small class="muted">' + fmtDay(dayKey(w.u)) + ' · إلى: ' + esc(nm(w.to)) + '</small>' + ps.filter(p => !w.to || w.to === '*' || w.to === p.id).map(p => { const a = Kid.of(p.id).W[w.id]; return '<p style="white-space:pre-wrap;margin:6px 0"><b>' + esc(p.name) + ':</b> ' + (a ? '✅ ' + esc(a.ans) : '<span class="muted">لم يجب بعد</span>') + '</p>'; }).join('') + '</div>').join('');
     return h;
   },
   m_msg() {
-    $('#cms').onclick = () => { const x = $('#cmx').value.trim(); if (!x) return; const c = Coach.get(); c.msgs[rid(8)] = { t: now(), x }; Coach.save(); toast('أُرسلت ✅'); App.render(); };
-    $('#cwn').onclick = () => { const t = $('#cwt').value.trim(), b = $('#cwb').value.trim(); if (!t) { toast('اكتب عنواناً'); return; } const c = Coach.get(); const w = { id: rid(8), title: t, body: b, u: now() }; c.wk = w; c.wkh[w.id] = w; Coach.save(); toast('نُشر التحدي ✅'); App.render(); };
+    $('#cms').onclick = () => { const x = $('#cmx').value.trim(); if (!x) return; const c = Coach.get(); c.msgs[rid(8)] = { t: now(), x, to: $('#cmto').value }; Coach.save(); toast('أُرسلت ✅'); App.render(); };
+    $('#cwn').onclick = () => { const t = $('#cwt').value.trim(), b = $('#cwb').value.trim(); if (!t) { toast('اكتب عنواناً'); return; } const c = Coach.get(); const w = { id: rid(8), title: t, body: b, to: $('#cwto').value, u: now() }; c.wk = w; c.wkh[w.id] = w; Coach.save(); toast('نُشر التحدي ✅'); App.render(); };
     const x = $('#cwx'); if (x) x.onclick = () => { const c = Coach.get(); c.wk = { id: '', title: '', body: '', u: now() }; Coach.save(); App.render(); };
+  },
+
+  t_ply() {
+    const ps = Prof.list(); const c = Coach.get(); const goal = (c.goal && c.goal.n) || 400;
+    let h = '<div class="card"><h3 style="margin-top:0">🧒 اللاعبون</h3><p class="muted">كل لاعب له اسم وكلمة مرور بسيطة. تُحفظ كلمة المرور في قاعدة البيانات <b>مشفّرة كبصمة (Hash)</b>، ولا يمكن لأحد قراءتها، ولا تظهر في كود الموقع.</p>' +
+      (ps.length ? '<table class="t"><tbody>' + ps.map(p => { const D = App.derive(p.id); return '<tr><td>' + Art.eagle('happy', D.rank, false, App.lookOf(Kid.of(p.id), false)).replace('class="eagle"', 'class="eagle" style="width:44px;vertical-align:middle"') + ' <b>' + esc(p.name) + '</b><br><small class="muted">' + esc(RANKS[D.rank].n) + ' · <bdi>' + D.xp + ' XP</bdi></small></td><td><button class="btn sm sec" data-ren="' + p.id + '">تغيير الاسم</button> <button class="btn sm sec" data-pw="' + p.id + '">كلمة مرور جديدة</button></td></tr>'; }).join('') + '</tbody></table>' : '<p>لا يوجد لاعبون بعد.</p>') +
+      (Prof.freeId() && ps.length < 4 ? '<button class="btn" id="cadd" style="margin-top:8px">＋ إضافة لاعب</button>' : '') + '</div>';
+    h += '<div class="card"><h3 style="margin-top:0">🤝 هدف الإخوة المشترك (أسبوعياً)</h3><p class="muted">إذا جمعوا معاً هذا العدد من النقاط في الأسبوع، يحصل كل من شارك على +30 XP. يشجّعهم على التعاون لا التنافس فقط.</p><div class="row"><input class="inp mono" id="cgoal" type="number" min="100" step="50" value="' + goal + '" style="width:140px"><button class="btn sec" id="cgs">حفظ</button>' + (ps.length > 1 ? '<a class="btn sec" href="#/league" id="clg">🏆 لوحة الأبطال</a>' : '') + '</div></div>';
+    return h;
+  },
+  m_ply() {
+    const ask = (title, fields, cb) => { const m = modal('<h2>' + title + '</h2>' + fields.map((f, i) => '<input class="inp" id="mf' + i + '" ' + (f.pw ? 'type="password" autocomplete="new-password"' : '') + ' placeholder="' + esc(f.ph) + '" style="margin:6px 0">').join('') + '<p id="mfm" style="color:var(--bad);font-weight:800;min-height:1.3em;margin:0"></p><div class="row"><button class="btn" id="mfok">حفظ</button><button class="btn sec" data-close>إلغاء</button></div>'); $('#mfok', m.el).onclick = async () => { const v = fields.map((f, i) => $('#mf' + i, m.el).value.trim()); const err = await cb(v); if (err) $('#mfm', m.el).textContent = err; else { m.close(); toast('تم ✅'); App.render(); } }; };
+    $$('[data-ren]').forEach(b => b.onclick = () => ask('تغيير الاسم', [{ ph: 'الاسم الجديد' }], async v => { if (!v[0]) return 'اكتب اسماً'; Prof.set(b.dataset.ren, { name: v[0] }); const k = Kid.of(b.dataset.ren); k.name = v[0]; k.nameU = now(); Kid.mergeInto(b.dataset.ren, k); Sync.schedule(); }));
+    $$('[data-pw]').forEach(b => b.onclick = () => ask('كلمة مرور جديدة لـ' + esc(Prof.one(b.dataset.pw).name), [{ ph: 'كلمة المرور الجديدة', pw: 1 }, { ph: 'أعد كتابتها', pw: 1 }], async v => { if (v[0].length < 4) return '4 أحرف على الأقل'; if (v[0] !== v[1]) return 'غير متطابقتين'; await Prof.setPw(b.dataset.pw, v[0]); }));
+    const ad = $('#cadd'); if (ad) ad.onclick = () => ask('لاعب جديد', [{ ph: 'الاسم' }, { ph: 'كلمة المرور', pw: 1 }, { ph: 'أعد كتابتها', pw: 1 }], async v => { if (!v[0]) return 'اكتب اسماً'; if (Prof.list().some(p => p.name === v[0])) return 'الاسم موجود'; if (v[1].length < 4) return 'كلمة المرور: 4 أحرف على الأقل'; if (v[1] !== v[2]) return 'غير متطابقتين'; const id = await Prof.create(v[0], v[1]); if (!id) return 'لا يوجد مكان'; const k = Kid.of(id); k.name = v[0]; k.nameU = now(); Kid.mergeInto(id, k); Sync.schedule(); });
+    $('#cgs').onclick = () => { const n = Math.max(100, +$('#cgoal').value || 400); const c = Coach.get(); c.goal = { n, u: now() }; Coach.save(); toast('تم الحفظ ✅'); };
+    const lg = $('#clg'); if (lg) lg.onclick = e => { e.preventDefault(); const ps = Prof.list(); App.startPreview(ps[0].id); App.go('league'); };
   },
 
   t_data() {
@@ -182,9 +213,9 @@ const CoachUI = {
     return h;
   },
   m_data() {
-    $('#cexp').onclick = () => { const blob = new Blob([JSON.stringify({ app: 'oqab', v: SCHEMA, at: new Date().toISOString(), kid: Kid.get(), coach: Coach.get() }, null, 1)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'oqab-backup-' + dayKey() + '.json'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); toast('تم التنزيل ✅'); };
-    $('#cimp').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { const j = JSON.parse(await f.text()); if (j.app !== 'oqab') throw 0; Kid.mergeIn(j.kid); Coach.mergeIn(j.coach); Kid.save(); Coach.save(); toast('تم الدمج ✅'); App.render(); } catch (x) { toast('الملف غير صالح'); } };
+    $('#cexp').onclick = () => { const blob = new Blob([JSON.stringify({ app: 'oqab', v: SCHEMA, at: new Date().toISOString(), prof: Prof.get(), kids: Object.fromEntries(Object.keys(Prof.get().list).map(id => [id, Kid.of(id)])), coach: Coach.get() }, null, 1)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'oqab-backup-' + dayKey() + '.json'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); toast('تم التنزيل ✅'); };
+    $('#cimp').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { const j = JSON.parse(await f.text()); if (j.app !== 'oqab') throw 0; if (j.prof) Prof.mergeIn(j.prof); if (j.kids) Object.keys(j.kids).forEach(id => Kid.mergeInto(id, j.kids[id])); if (j.kid) { const f = Prof.list()[0]; if (f) Kid.mergeInto(f.id, j.kid); } if (j.coach) Coach.mergeIn(j.coach); Coach.save(); Sync.schedule(); toast('تم الدمج ✅'); App.render(); } catch (x) { toast('الملف غير صالح'); } };
     $('#cnps').onclick = async () => { const p = $('#cnp').value.trim(); if (!/^\d{4,8}$/.test(p)) { toast('من 4 إلى 8 أرقام'); return; } await CoachUI.setPin(p); toast('تم تغيير الرمز ✅'); $('#cnp').value = ''; };
-    $('#crole').onclick = () => { const d = Dev.get(); Dev.set('role', d.role === 'coach' ? 'kid' : 'coach'); if (d.role === 'kid') { CoachUI.open = false; Dev.set('coachUntil', 0); } App.render(); };
+    $('#crole').onclick = () => { const d = Dev.get(); Dev.set('role', d.role === 'coach' ? 'kid' : 'coach');  App.render(); };
   }
 };

@@ -57,31 +57,43 @@ const LS = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
 };
-const K_KID = 'oqab_kid', K_COACH = 'oqab_coach', K_DEV = 'oqab_dev', K_BAK = 'oqab_kid_bak';
-const SCHEMA = 1;
+const SS = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { if (v == null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (e) { } } };
+const K_KID = 'oqab_kid', K_COACH = 'oqab_coach', K_DEV = 'oqab_dev', K_BAK = 'oqab_kid_bak', K_PROF = 'oqab_prof';
+const SCHEMA = 2;
+const PIDS = ['k1', 'k2', 'k3', 'k4'];
 
-function emptyKid() { return { v: SCHEMA, name: '', nameU: 0, pledge: 0, L: {}, T: {}, C: {}, M: {}, G: {}, R: {}, D: {}, E: {}, W: {}, MR: {}, X: {} }; }
-function emptyCoach() { return { v: SCHEMA, pin: null, U: {}, msgs: {}, wk: null, wkh: {}, ctfU: null }; }
+function emptyKid() { return { v: SCHEMA, name: '', nameU: 0, pledge: 0, L: {}, T: {}, C: {}, M: {}, G: {}, R: {}, D: {}, E: {}, W: {}, MR: {}, X: {}, look: null }; }
+function emptyCoach() { return { v: SCHEMA, pin: null, U: {}, msgs: {}, wk: null, wkh: {}, ctfU: {}, goal: null }; }
+function emptyProf() { return { v: SCHEMA, list: {} }; }
 
 /* migrations: never drop unknown fields */
 function migrateKid(k) {
   if (!k || typeof k !== 'object') return emptyKid();
   const e = emptyKid();
   for (const f in e) if (k[f] === undefined) k[f] = e[f];
-  if (!k.v) k.v = 1;
-  // future: if (k.v < 2) {...; k.v = 2}
+  if ((k.v || 1) < 2) k.v = 2;
   return k;
 }
 function migrateCoach(c) {
   if (!c || typeof c !== 'object') return emptyCoach();
   const e = emptyCoach();
   for (const f in e) if (c[f] === undefined) c[f] = e[f];
+  // v1: U = {unitId:{m,u}} for everyone  ->  v2: U = {'*' or pid: {unitId:{m,u}}}
+  const flat = Object.keys(c.U || {}).filter(k => c.U[k] && typeof c.U[k].m === 'string');
+  if (flat.length) { const all = c.U['*'] || {}; flat.forEach(k => { all[k] = c.U[k]; delete c.U[k]; }); c.U['*'] = all; }
+  if (c.ctfU && typeof c.ctfU.m === 'string') c.ctfU = { '*': c.ctfU };
+  if (!c.ctfU) c.ctfU = {};
+  if ((c.v || 1) < 2) c.v = 2;
   return c;
 }
+function migrateProf(p) { if (!p || typeof p !== 'object') return emptyProf(); if (!p.list) p.list = {}; return p; }
 
 /* ---------- merge (deterministic, never loses progress) ---------- */
 function mergeMap(a, b, fn) { const o = {}; a = a || {}; b = b || {}; for (const k in a) o[k] = k in b ? fn(a[k], b[k]) : a[k]; for (const k in b) if (!(k in a)) o[k] = b[k]; return o; }
 const uniq = arr => Array.from(new Set(arr));
+const canon = x => { if (Array.isArray(x)) return '[' + x.map(canon).join(',') + ']'; if (x && typeof x === 'object') return '{' + Object.keys(x).sort().map(k => JSON.stringify(k) + ':' + canon(x[k])).join(',') + '}'; return JSON.stringify(x === undefined ? null : x); };
+const same = (a, b) => canon(a) === canon(b);
+const lww = (x, y) => (!x ? y : !y ? x : ((y.u || 0) !== (x.u || 0) ? ((y.u || 0) > (x.u || 0) ? y : x) : (canon(y) > canon(x) ? y : x)));
 function mergeKid(a, b) {
   a = migrateKid(a || emptyKid()); b = migrateKid(b || emptyKid());
   const o = Object.assign({}, b, a);
@@ -95,61 +107,83 @@ function mergeKid(a, b) {
   o.G = mergeMap(a.G, b.G, minD);
   o.MR = mergeMap(a.MR, b.MR, minD);
   o.X = mergeMap(a.X, b.X, minD);
-  o.R = mergeMap(a.R, b.R, (x, y) => ((y.u || 0) !== (x.u || 0) ? ((y.u || 0) > (x.u || 0) ? y : x) : (canon(y) > canon(x) ? y : x)));
+  o.R = mergeMap(a.R, b.R, lww);
   o.D = mergeMap(a.D, b.D, (x, y) => mergeMap(x, y, (p, q) => ({ s: maxN(p.s, q.s), k: mergeMap(p.k, q.k, minD), rx: maxN(p.rx, q.rx), ty: maxN(p.ty, q.ty) })));
   o.W = mergeMap(a.W, b.W, (x, y) => ({ d: minD(x.d, y.d), ans: ((x.ans || '').length !== (y.ans || '').length ? ((x.ans || '').length > (y.ans || '').length ? x.ans : y.ans) : ((x.ans || '') >= (y.ans || '') ? x.ans : y.ans)) }));
+  o.look = lww(a.look, b.look);
   const E = Object.assign({}, b.E || {}, a.E || {});
   const ids = Object.keys(E);
-  if (ids.length > 700) { ids.sort((p, q) => E[q].t - E[p].t); for (const id of ids.slice(700)) delete E[id]; }
+  if (ids.length > 700) { ids.sort((p, q) => E[q].t - E[p].t || (p < q ? -1 : 1)); for (const id of ids.slice(700)) delete E[id]; }
   o.E = E;
   return o;
 }
 function mergeCoach(a, b) {
   a = migrateCoach(a || emptyCoach()); b = migrateCoach(b || emptyCoach());
-  const lww = (x, y) => (!x ? y : !y ? x : ((y.u || 0) !== (x.u || 0) ? ((y.u || 0) > (x.u || 0) ? y : x) : (canon(y) > canon(x) ? y : x)));
   const o = Object.assign({}, b, a);
   o.pin = lww(a.pin, b.pin);
-  o.U = mergeMap(a.U, b.U, lww);
+  o.U = mergeMap(a.U, b.U, (x, y) => mergeMap(x, y, lww));
   o.msgs = Object.assign({}, b.msgs || {}, a.msgs || {});
   o.wk = lww(a.wk, b.wk);
   o.wkh = Object.assign({}, b.wkh || {}, a.wkh || {});
-  o.ctfU = lww(a.ctfU, b.ctfU);
+  o.ctfU = mergeMap(a.ctfU, b.ctfU, lww);
+  o.goal = lww(a.goal, b.goal);
   return o;
 }
-const canon = x => { if (Array.isArray(x)) return '[' + x.map(canon).join(',') + ']'; if (x && typeof x === 'object') return '{' + Object.keys(x).sort().map(k => JSON.stringify(k) + ':' + canon(x[k])).join(',') + '}'; return JSON.stringify(x === undefined ? null : x); };
-const same = (a, b) => canon(a) === canon(b);
+function mergeProf(a, b) { a = migrateProf(a); b = migrateProf(b); const o = Object.assign({}, b, a); o.list = mergeMap(a.list, b.list, lww); return o; }
 
 /* ---------- device ---------- */
 const Dev = (() => {
   let d = LS.get(K_DEV, null);
-  if (!d) { d = { id: rid(6), fam: '', role: '', seen: null, sound: 1, big: 0, coachUntil: 0 }; LS.set(K_DEV, d); }
+  if (!d) { d = { id: rid(6), fam: '', role: '', seen: {}, sound: 1, big: 0 }; LS.set(K_DEV, d); }
+  if (!d.seen || typeof d.seen.rank === 'number') d.seen = {};
   return { get: () => d, save: () => LS.set(K_DEV, d), set(k, v) { d[k] = v; LS.set(K_DEV, d); } };
 })();
 
-/* ---------- Kid store ---------- */
+/* ---------- Profiles (names + hashed simple passwords; stored in the family database, never in the code) ---------- */
+const Prof = (() => {
+  let p = migrateProf(LS.get(K_PROF, null));
+  const ls = [];
+  return {
+    get: () => p,
+    list() { return PIDS.filter(id => p.list[id] && !p.list[id].hide).map(id => Object.assign({ id }, p.list[id])); },
+    one: id => p.list[id] || null,
+    mergeIn(x) { const m = mergeProf(p, x); const ch = !same(m, p); p = m; LS.set(K_PROF, p); if (ch) ls.forEach(f => f()); return ch; },
+    replace(x) { p = migrateProf(x); LS.set(K_PROF, p); ls.forEach(f => f()); },
+    on(f) { ls.push(f); },
+    set(id, obj) { p.list[id] = Object.assign({}, p.list[id] || {}, obj, { u: now() }); LS.set(K_PROF, p); ls.forEach(f => f()); Sync.schedule(); },
+    freeId() { return PIDS.find(id => !p.list[id]); },
+    async hash(id, salt, pw) { return sha('oqab-pw|' + id + '|' + salt + '|' + String(pw).trim().toLowerCase()); },
+    async create(name, pw) { const id = Prof.freeId(); if (!id) return null; const salt = rid(10); const h = await Prof.hash(id, salt, pw); Prof.set(id, { name, salt, h, c: now() }); return id; },
+    async check(id, pw) { const x = p.list[id]; if (!x) return false; return (await Prof.hash(id, x.salt, pw)) === x.h; },
+    async setPw(id, pw) { const salt = rid(10); Prof.set(id, { salt, h: await Prof.hash(id, salt, pw) }); }
+  };
+})();
+
+/* ---------- Kid stores (one per player) ---------- */
 const Kid = (() => {
-  let s = migrateKid(LS.get(K_KID, null));
-  let pushT = 0, listeners = [];
-  const bak = LS.get(K_BAK, null);
-  if (!bak || bak.day !== dayKey()) LS.set(K_BAK, { day: dayKey(), kid: s });
-  function save(cloud = true) {
-    LS.set(K_KID, s);
-    listeners.forEach(f => f());
-    if (cloud) Sync.schedule();
-  }
-  const live = () => !App.preview && Dev.get().role !== 'coach';
+  const cache = {}; const ls = [];
+  const key = id => K_KID + '_' + id;
+  function of(id) { if (!id) return emptyKid(); if (!cache[id]) cache[id] = migrateKid(LS.get(key(id), null)); return cache[id]; }
+  let pid = SS.get('oqab_pid'); if (pid && !Prof.one(pid)) pid = null;
+  let s = of(pid);
+  const live = () => !!pid && !App.preview && Dev.get().role !== 'coach';
+  function persist(id) { LS.set(key(id), cache[id]); }
+  function save(cloud = true) { if (!pid) return; persist(pid); ls.forEach(f => f()); if (cloud) Sync.schedule(); }
   function ev(k, data) { if (!live()) return; const id = Dev.get().id + '_' + rid(6); s.E[id] = Object.assign({ t: now(), k }, data || {}); }
   function today() { const k = dayKey(), dv = Dev.get().id; s.D[k] = s.D[k] || {}; s.D[k][dv] = s.D[k][dv] || { s: 0, k: {}, rx: 0, ty: 0 }; return s.D[k][dv]; }
+  let pushT = 0;
   return {
-    get: () => s,
-    replace(x) { s = migrateKid(x); save(false); },
-    mergeIn(x) { const m = mergeKid(s, x); const changed = !same(m, s); s = m; LS.set(K_KID, s); if (changed) listeners.forEach(f => f()); return changed; },
-    on(f) { listeners.push(f); },
-    save, ev, today,
+    get: () => s, of, pid: () => pid,
+    use(id, remember = true) { pid = id || null; s = of(pid); if (remember) SS.set('oqab_pid', pid); if (pid) { const bak = LS.get(K_BAK + '_' + pid, null); if (!bak || bak.day !== dayKey()) LS.set(K_BAK + '_' + pid, { day: dayKey(), kid: s }); } ls.forEach(f => f()); },
+    mergeInto(id, x) { const cur = of(id); const m = mergeKid(cur, x); const ch = !same(m, cur); cache[id] = m; if (id === pid) s = m; persist(id); if (ch) ls.forEach(f => f()); return ch; },
+    mergeIn(x) { return pid ? Kid.mergeInto(pid, x) : false; },
+    on(f) { ls.push(f); },
+    save, ev, today, live,
     seeTerm(id) { if (!live()) return; if (!s.G[id]) { s.G[id] = now(); clearTimeout(pushT); pushT = setTimeout(save, 400); } },
     setName(n) { s.name = n; s.nameU = now(); save(); },
-    pledge() { if (!s.pledge) { s.pledge = now(); save(); } },
-    tick(sec, lessonKey) { if (!live()) return; today().s += sec; if (lessonKey && s.L[lessonKey]) s.L[lessonKey].s = (s.L[lessonKey].s || 0) + sec; LS.set(K_KID, s); },
+    setLook(look) { s.look = Object.assign({}, s.look || {}, look, { u: now() }); save(); },
+    pledge() { if (pid && !s.pledge) { s.pledge = now(); save(); } },
+    tick(sec, lessonKey) { if (!live()) return; today().s += sec; if (lessonKey && s.L[lessonKey]) s.L[lessonKey].s = (s.L[lessonKey].s || 0) + sec; persist(pid); },
     task(name) { if (!live()) return false; const t = today(); if (t.k[name]) return false; t.k[name] = now(); save(); return true; },
     lessonStart(key) { if (!live()) return; s.L[key] = s.L[key] || { d: 0, s: 0, t: 0, h: 0, w: [] }; },
     lessonWrong(key, tag) { if (!live()) return; const l = s.L[key]; if (!l) return; l.t = (l.t || 0) + 1; if (tag && !(l.w || []).includes(tag)) (l.w = l.w || []).push(tag); },
@@ -189,7 +223,10 @@ const Coach = (() => {
     replace(x) { c = migrateCoach(x); LS.set(K_COACH, c); listeners.forEach(f => f()); },
     mergeIn(x) { const m = mergeCoach(c, x); const ch = !same(m, c); c = m; LS.set(K_COACH, c); if (ch) listeners.forEach(f => f()); return ch; },
     on(f) { listeners.push(f); },
-    save() { LS.set(K_COACH, c); listeners.forEach(f => f()); Sync.schedule(true); }
+    save() { LS.set(K_COACH, c); listeners.forEach(f => f()); Sync.schedule(); },
+    /* unit override for a player: player-specific beats "all" when newer */
+    unit(pid, uid) { const a = c.U['*'] && c.U['*'][uid], b = pid && c.U[pid] && c.U[pid][uid]; const w = lww(a, b); return w && w.m || ''; },
+    stage2(pid) { const w = lww(c.ctfU['*'], pid && c.ctfU[pid]); return w && w.m || ''; }
   };
 })();
 
@@ -198,40 +235,58 @@ async function sha(text) {
   catch (e) { let h = 5381; for (const ch of text) h = ((h << 5) + h + ch.charCodeAt(0)) | 0; return 'x' + (h >>> 0).toString(16); }
 }
 
-/* ---------- Sync (Firebase optional) ---------- */
+/* legacy single-player data (v1) -> first player */
+function adoptLegacy(id, remoteKid) {
+  const old = LS.get(K_KID, null);
+  if (old && old.pledge) { Kid.mergeInto(id, old); try { localStorage.removeItem(K_KID); } catch (e) { } }
+  if (remoteKid && remoteKid.pledge) Kid.mergeInto(id, remoteKid);
+}
+
+/* ---------- Sync (Firebase optional). Docs: coach, p (players), k1..k4 (progress) ---------- */
 const Sync = (() => {
-  let api = null, state = 'local', t = 0, unsub = null, remoteKid = null, remoteCoach = null, busy = false, again = false;
-  const st = () => { const fam = Dev.get().fam; if (!fam) return 'local'; if (!api) return state === 'fail' ? 'fail' : 'wait'; return state; };
-  function status() { return st(); }
+  let api = null, state = 'local', t = 0, busy = false, again = false;
+  const remote = {}; const subs = {};
+  const status = () => { if (!Dev.get().fam) return 'local'; if (!api) return state === 'fail' ? 'fail' : 'wait'; return state; };
+  const local = name => name === 'coach' ? Coach.get() : name === 'p' ? Prof.get() : Kid.of(name);
+  const paint = () => App.paintSync && App.paintSync();
   function attach(m) { api = m; state = 'wait'; start(); }
-  function fail() { state = 'fail'; App.paintSync && App.paintSync(); }
+  function fail() { state = 'fail'; paint(); }
+  function onDoc(name, val) {
+    remote[name] = val;
+    let ch = false;
+    if (val) { if (name === 'coach') ch = Coach.mergeIn(val); else if (name === 'p') ch = Prof.mergeIn(val); else ch = Kid.mergeInto(name, val); }
+    if (ch) App.refresh();
+    if (!val || !same(local(name), val)) schedule();
+    if (name === 'p') watchKids();
+    state = 'on'; paint();
+  }
+  function sub(name) { if (subs[name] || !api) return; const fam = Dev.get().fam; subs[name] = api.watchDoc(fam, name, v => onDoc(name, v), () => { state = 'wait'; paint(); }); }
+  function watchKids() { Object.keys(Prof.get().list).forEach(sub); }
   async function start() {
     if (!api) return;
-    const fam = Dev.get().fam; if (unsub) { unsub(); unsub = null; }
-    if (!fam) { state = 'local'; App.paintSync && App.paintSync(); return; }
-    try {
-      await api.init(window.FIREBASE_CONFIG);
-      unsub = api.watch(fam, k => { remoteKid = k; if (k && Kid.mergeIn(k)) App.refresh(); if (!k || !same(Kid.get(), k)) schedule(); state = 'on'; App.paintSync && App.paintSync(); },
-        c => { remoteCoach = c; if (c && Coach.mergeIn(c)) App.refresh(); if (!c || !same(Coach.get(), c)) schedule(true); },
-        () => { state = 'wait'; App.paintSync && App.paintSync(); });
-    } catch (e) { fail(); }
+    for (const k in subs) { try { subs[k](); } catch (e) { } delete subs[k]; }
+    for (const k in remote) delete remote[k];
+    if (!Dev.get().fam) { state = 'local'; paint(); return; }
+    try { await api.init(window.FIREBASE_CONFIG); sub('coach'); sub('p'); watchKids(); } catch (e) { fail(); }
   }
-  function schedule(coachToo) { if (!api || !Dev.get().fam || App.preview) return; if (coachToo) again = 'c'; clearTimeout(t); t = setTimeout(push, 2500); }
+  function schedule() { if (!api || !Dev.get().fam || App.preview) return; clearTimeout(t); t = setTimeout(push, 2500); }
   async function push() {
-    if (!api || busy) { again = again || true; return; }
+    if (!api || busy) { again = true; return; }
     busy = true; const fam = Dev.get().fam;
     try {
-      const k = Kid.get();
-      if (!remoteKid || !same(k, remoteKid)) { await api.save(fam, 'kid', k); remoteKid = JSON.parse(JSON.stringify(k)); }
-      const c = Coach.get();
-      if (!remoteCoach || !same(c, remoteCoach)) { await api.save(fam, 'coach', c); remoteCoach = JSON.parse(JSON.stringify(c)); }
+      const names = ['p', 'coach'].concat(Object.keys(Prof.get().list));
+      for (const n of names) {
+        const v = local(n);
+        if (n.startsWith('k') && !v.pledge && !remote[n]) continue;
+        if (!remote[n] || !same(v, remote[n])) { await api.saveDoc(fam, n, v); remote[n] = JSON.parse(JSON.stringify(v)); }
+      }
       state = 'on';
-    } catch (e) { state = 'wait'; setTimeout(() => schedule(), 15000); }
-    busy = false; App.paintSync && App.paintSync();
+    } catch (e) { state = 'wait'; setTimeout(schedule, 15000); }
+    busy = false; paint();
     if (again) { again = false; schedule(); }
   }
-  async function fetchOnce(fam) { if (!api) return null; await api.init(window.FIREBASE_CONFIG); return api.fetch(fam); }
-  return { attach, fail, start, schedule, status, push, fetchOnce, has: () => !!api };
+  async function fetchAll(fam) { if (!api) return null; await api.init(window.FIREBASE_CONFIG); return api.getDocs(fam, ['coach', 'p', 'kid'].concat(PIDS)); }
+  return { attach, fail, start, schedule, status, push, fetchAll, has: () => !!api, remote };
 })();
 
 /* ---------- Sound (WebAudio, no files) ---------- */
