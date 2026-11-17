@@ -5,7 +5,7 @@ const RANKS = [
   { n: 'مستكشف رقمي', x: 0 }, { n: 'متدرّب أمني', x: 300 }, { n: 'حارس الشبكة', x: 900 }, { n: 'محلّل أمني', x: 1800 },
   { n: 'صائد الثغرات', x: 3000 }, { n: 'هاكر أخلاقي', x: 4500 }, { n: 'خبير أمن سيبراني', x: 6500 }
 ];
-const DOMAINS = { pc: ['الحاسوب', '#2F6BD8'], safe: ['الأمان الشخصي', '#14A37F'], term: ['الطرفية', '#334155'], py: ['البرمجة', '#9B6BFF'], net: ['الشبكات', '#0EA5E9'], web: ['الويب', '#F97316'], cry: ['التشفير', '#C27C00'], mind: ['التفكير الأمني', '#E04B4B'], for: ['التحقيق الرقمي', '#0F766E'], ctf: ['التحديات', '#16A34A'], gen: ['عامة', '#64748B'] };
+const DOMAINS = { pc: ['الحاسوب', '#2F6BD8'], safe: ['الأمان الشخصي', '#14A37F'], term: ['الطرفية', '#334155'], py: ['البرمجة', '#9B6BFF'], net: ['الشبكات', '#0EA5E9'], web: ['الويب', '#F97316'], cry: ['التشفير', '#C27C00'], mind: ['التفكير الأمني', '#E04B4B'], for: ['التحقيق الرقمي', '#0F766E'], ctf: ['التحديات', '#16A34A'], algo: ['الخوارزميات', '#7C3AED'], linux: ['لينكس', '#475569'], db: ['قواعد البيانات', '#0891B2'], mal: ['البرمجيات الخبيثة', '#BE123C'], js: ['JavaScript', '#CA8A04'], team: ['المنافسة', '#DB2777'], gen: ['المثابرة', '#64748B'] };
 const MEDALS = {
   binary: { n: 'لغة الآلة', ic: '🔢', d: 'pc', how: 'اكتب اسمك بالثنائي' },
   pcparts: { n: 'مهندس العتاد', ic: '🧩', d: 'pc', how: 'رتّب أجزاء الحاسوب كلها' },
@@ -24,14 +24,65 @@ const MEDALS = {
   keys: { n: 'حارس المفاتيح', ic: '🗝️', d: 'cry', how: 'أرسل رسالة بالمفتاح العام' },
   eagleeye: { n: 'عين العُقاب', ic: '🦅', d: 'mind', how: 'اكتشف كل نقاط الضعف في البيت' },
   detective: { n: 'محقّق رقمي', ic: '🕵️', d: 'for', how: 'احلّ قضية الخادم المخترَق' },
+  grepper: { n: 'صيّاد الكلمات', ic: '🔦', d: 'term', how: 'ابحث بـ grep و find' },
+  bugfix: { n: 'صيّاد الحشرات', ic: '🐛', d: 'py', how: 'أصلح 3 أخطاء برمجية' },
+  counter: { n: 'عدّاد الهجمات', ic: '🧮', d: 'py', how: 'اصنع أداة تعدّ محاولات الهجوم' },
+  urlcheck: { n: 'قارئ الروابط', ic: '🔗', d: 'web', how: 'اكشف الروابط المزيّفة' },
+  bruteforce: { n: 'كاسر قيصر', ic: '🔨', d: 'cry', how: 'اكسر شيفرة بتجربة كل المفاتيح' },
+  meta: { n: 'كاشف الأسرار المخفية', ic: '🗺️', d: 'for', how: 'اكتشف البيانات الوصفية في صورة' },
   flags: { n: 'صائد الأعلام', ic: '🚩', d: 'ctf', how: 'التقط 8 أعلام' },
   flagmaster: { n: 'سيد الأعلام', ic: '🏆', d: 'ctf', how: 'التقط كل الأعلام' },
   nohint: { n: 'بلا تلميحات', ic: '🧠', d: 'ctf', how: 'التقط 5 أعلام دون تلميح' },
   typer: { n: 'أصابع البرق', ic: '⚡', d: 'gen', how: 'اكتب 25 كلمة في الدقيقة' },
   streak7: { n: 'أسبوع النار', ic: '🔥', d: 'gen', how: '7 أيام متتالية' },
   streak30: { n: 'شهر الحديد', ic: '🛡️', d: 'gen', how: '30 يوماً متتالياً' },
-  stage1: { n: 'خرّيج المرحلة الأولى', ic: '🎓', d: 'gen', how: 'أنهِ مشروع المرحلة الأولى' }
+  stage1: { n: 'خرّيج المرحلة الأولى', ic: '🎓', d: 'gen', how: 'أنهِ المشروع الكبير الثاني' },
+  proj1: { n: 'حارس العُش', ic: '🪺', d: 'gen', how: 'أنهِ المشروع الكبير الأول' },
+  sorter: { n: 'مرتّب البطاقات', ic: '🃏', d: 'algo', how: 'رتّب البطاقات بخوارزمية' },
+  binsearch: { n: 'صائد الرقم', ic: '🎯', d: 'algo', how: 'اعثر على الرقم بأقل التخمينات' },
+  dicts: { n: 'سيد القواميس', ic: '📚', d: 'py', how: 'استخدم القواميس في Python' },
+  filer: { n: 'أمين الملفات', ic: '🗃️', d: 'py', how: 'اقرأ ملفاً واكتبه بـ Python' },
+  perms: { n: 'حارس الصلاحيات', ic: '🔏', d: 'linux', how: 'اضبط صلاحيات ملف سري' },
+  root: { n: 'مروّض المدير', ic: '👑', d: 'linux', how: 'افهم sudo وحساب root' },
+  sql: { n: 'سيد SQL', ic: '🗄️', d: 'db', how: 'اكتب استعلامات SQL صحيحة' },
+  dbguard: { n: 'حارس البيانات', ic: '🛡️', d: 'db', how: 'احمِ قاعدة البيانات من الحقن' },
+  pinger: { n: 'صاحب الصدى', ic: '📡', d: 'net', how: 'استخدم ping و traceroute' },
+  handshake: { n: 'المصافحة الثلاثية', ic: '🤝', d: 'net', how: 'رتّب مصافحة TCP' },
+  antivirus: { n: 'صائد الديدان', ic: '🦠', d: 'mal', how: 'صنّف البرامج الخبيثة' },
+  backup: { n: 'بطل النسخ الاحتياطي', ic: '💾', d: 'mal', how: 'اهزم برنامج الفدية' },
+  jsfirst: { n: 'أول سكربت', ic: '⚡', d: 'js', how: 'شغّل أول كود JavaScript' },
+  xss: { n: 'كاشف الحقن', ic: '💉', d: 'js', how: 'اكتشف ثغرة حقن السكربت' },
+  xor: { n: 'ساحر XOR', ic: '🔀', d: 'cry', how: 'شفّر وفكّ بـ XOR' },
+  signer: { n: 'صاحب التوقيع', ic: '✍️', d: 'cry', how: 'وقّع رسالة وتحقّق منها' },
+  lessons25: { n: 'تلميذ مجتهد', ic: '📗', d: 'gen', how: 'أنهِ 25 درساً' },
+  lessons50: { n: 'باحث لا يتوقف', ic: '📘', d: 'gen', how: 'أنهِ 50 درساً' },
+  lessons100: { n: 'الموسوعة', ic: '📚', d: 'gen', how: 'أنهِ 100 درس' },
+  perfect: { n: 'العلامة الكاملة', ic: '💯', d: 'gen', how: '100% في اختبار من أول محاولة' },
+  stars5: { n: 'جامع النجوم', ic: '🌟', d: 'gen', how: '3 نجوم في 5 وحدات' },
+  starsall: { n: 'نجوم السماء', ic: '🌌', d: 'gen', how: '3 نجوم في كل الوحدات' },
+  review50: { n: 'ذاكرة الفيل', ic: '🐘', d: 'gen', how: '50 إجابة صحيحة في المراجعة' },
+  streak14: { n: 'أسبوعان من النار', ic: '☄️', d: 'gen', how: '14 يوماً متتالياً' },
+  typer40: { n: 'إعصار الكيبورد', ic: '🌪️', d: 'gen', how: 'اكتب 40 كلمة في الدقيقة' },
+  weekly5: { n: 'صائد التحديات', ic: '🏹', d: 'gen', how: 'أجب عن 5 تحديات أسبوعية' },
+  crowns3: { n: 'الملك المتوّج', ic: '🤴', d: 'team', how: 'كن بطل الأسبوع 3 مرات' },
+  win2: { n: 'لا يُوقف', ic: '🚀', d: 'team', how: 'افز بأسبوعين متتاليين' },
+  goals5: { n: 'روح الفريق', ic: '🤝', d: 'team', how: 'حقّقوا الهدف المشترك 5 مرات' },
+  tr_recon: { n: 'عين السماء', ic: '🔭', d: 'ctf', how: 'أنهِ مسار الاستطلاع' },
+  tr_web: { n: 'فارس الويب', ic: '🌐', d: 'ctf', how: 'أنهِ مسار ثغرات الويب' },
+  tr_crypto: { n: 'كاسر الأقفال', ic: '🔓', d: 'ctf', how: 'أنهِ مسار كسر الشيفرات' },
+  tr_files: { n: 'عدسة المحقّق', ic: '🔍', d: 'ctf', how: 'أنهِ مسار تحليل الملفات' },
+  tr_linux: { n: 'سيد الخوادم', ic: '🐧', d: 'ctf', how: 'أنهِ مسار لينكس' },
+  tr_code: { n: 'قارئ الكود', ic: '🧾', d: 'ctf', how: 'أنهِ مسار قراءة الكود' },
+  tr_net: { n: 'متتبّع الحزم', ic: '📦', d: 'ctf', how: 'أنهِ مسار حزم الشبكة' },
+  tr_case: { n: 'محقّق القضايا الكبرى', ic: '🗂️', d: 'ctf', how: 'احلّ كل القضايا' }
 };
+/* titles shown under the player's name (chosen in the wardrobe) */
+const TITLES = [
+  ['t0', 'مستكشف صغير', null], ['t1', 'سيد الطرفية', { medal: 'term' }], ['t2', 'المبرمج الصغير', { medal: 'funcs' }], ['t3', 'كاسر الشيفرات', { medal: 'caesar' }],
+  ['t4', 'حارس الشبكة', { medal: 'ports' }], ['t5', 'المحقّق الرقمي', { medal: 'detective' }], ['t6', 'سيد لينكس', { medal: 'root' }], ['t7', 'خبير البيانات', { medal: 'sql' }],
+  ['t8', 'صائد الديدان', { medal: 'antivirus' }], ['t9', 'جامع النجوم', { medal: 'stars5' }], ['t10', 'صائد الأعلام', { medal: 'flags' }], ['t11', 'الملك المتوّج', { medal: 'crowns3' }],
+  ['t12', 'الموسوعة', { medal: 'lessons100' }], ['t13', 'أسطورة عُقاب', { medal: 'flagmaster' }]
+];
 
 const App = {
   preview: false, route: [], celeQ: [], celeOn: false, lessonKey: null, busy: false,
@@ -70,7 +121,7 @@ const App = {
     if (Math.random() < .2) Sync.schedule();
   },
   refresh() { if (['lesson', 'test', 'ctfc', 'review', 'typing', 'newplayer'].includes(App.route[0])) { App.paintTop(); return; } App.render(); },
-  onKid() { App.paintTop(); App.checkCele(); },
+  onKid() { App.paintTop(); clearTimeout(App.amT); App.amT = setTimeout(App.autoMedals, 300); App.checkCele(); },
   onCoach() { App.applyStage(); App.checkMsgs(); },
 
   /* ---------- derived ---------- */
@@ -91,7 +142,7 @@ const App = {
       if (x) it.push([noon(day), x]);
     }
     for (const w in k.W) it.push([k.W[w].d || 0, 50]);
-    if (k.X.final) it.push([k.X.final, 200]);
+    for (const x in k.X) if (x === 'final' || x.startsWith('p_')) { if (!(x === 'p_final' && k.X.final)) it.push([k.X[x], 200]); }
     return { it, active };
   },
   weekStart(t) { const d = new Date(t || now()); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 1) % 7)); return d.getTime(); },
@@ -126,25 +177,48 @@ const App = {
     let cur = active[today] ? today : addDays(today, -1);
     while (active[cur]) { streak++; cur = addDays(cur, -1); }
     let rank = 0; RANKS.forEach((r, i) => { if (xp >= r.x) rank = i; });
-    const st = {};
+    const st = {}; const testAll = pid === 'kt' && Dev.get().testOpen;
+    const passedOf = (u) => u.project ? !!(k.X['p_' + u.id] || (u.id === 'final' && k.X.final)) : !!(k.T[u.id] && k.T[u.id].p);
     units.forEach((u, i) => {
       const prev = units[i - 1];
-      let open = i === 0 || !!(k.T[prev.id] && k.T[prev.id].p);
+      const ld = u.lessons.filter(l => k.L[u.id + '.' + l.id] && k.L[u.id + '.' + l.id].d).length;
+      const started = ld > 0 || !!k.T[u.id];
+      let open = i === 0 || passedOf(prev) || started || testAll;
       const ov = Coach.unit(pid, u.id);
       if (ov === 'open') open = true; if (ov === 'lock') open = false;
-      const ld = u.lessons.filter(l => k.L[u.id + '.' + l.id] && k.L[u.id + '.' + l.id].d).length;
-      st[u.id] = { open, ld, total: u.lessons.length, passed: !!(k.T[u.id] && k.T[u.id].p), best: (k.T[u.id] && k.T[u.id].b) || 0, ov };
+      const best = (k.T[u.id] && k.T[u.id].b) || 0;
+      st[u.id] = { open, ld, total: u.lessons.length, passed: passedOf(u), best, stars: u.project ? 0 : best >= 100 ? 3 : best >= 90 ? 2 : best >= 80 ? 1 : 0, ov, project: !!u.project };
     });
-    const last = units[units.length - 1];
-    let finalOpen = !!(k.T[last.id] && k.T[last.id].p);
-    const fov = Coach.unit(pid, 'final'); if (fov === 'open') finalOpen = true; if (fov === 'lock') finalOpen = false;
-    const fl = C.final ? C.final.lessons.filter(l => k.L['final.' + l.id] && k.L['final.' + l.id].d).length : 0;
-    st.final = { open: finalOpen, ld: fl, total: C.final ? C.final.lessons.length : 0, passed: !!k.X.final, ov: fov };
-    let stage2 = !!k.X.final;
+    let stage2 = passedOf(units[units.length - 1]) || testAll;
     const cu = Coach.stage2(pid); if (cu === 'open') stage2 = true; if (cu === 'lock') stage2 = false;
     const solved = Object.keys(k.C).filter(id => k.C[id].d && C.ctf.some(x => x.id === id));
     const crowns = lg ? (lg.crowns[pid] || 0) : 0, king = lg ? lg.king === pid : false;
     return { xp, week, rank, streak, active, st, stage2, solved, lessonsDone, crowns, king };
+  },
+  pname(pid) { return pid === 'kt' ? 'المختبِر 🧪' : pid === 'demo' ? 'لاعب جديد' : ((Prof.one(pid) || {}).name || ''); },
+  titleOf(k) { const t = TITLES.find(x => x[0] === ((k && k.look && k.look.title) || 't0')); const ok = t && (!t[2] || (k.M && k.M[t[2].medal])); return ok ? t[1] : TITLES[0][1]; },
+  /* medals that come from totals rather than one lesson */
+  autoMedals() {
+    if (!Kid.live() || App.amBusy) return; App.amBusy = true;
+    try {
+      const k = Kid.get(), D = App.derive(), give = id => { if (!k.M[id] && MEDALS[id]) Kid.medal(id); };
+      const nL = Object.keys(D.lessonsDone).length;
+      if (nL >= 25) give('lessons25'); if (nL >= 50) give('lessons50'); if (nL >= 100) give('lessons100');
+      const tested = C.units.filter(u => !u.project); const s3 = tested.filter(u => D.st[u.id].stars === 3).length;
+      if (s3 >= 5) give('stars5'); if (s3 === tested.length) give('starsall');
+      let rx = 0; for (const d in k.D) { let m = 0; for (const dv in k.D[d]) m = Math.max(m, k.D[d][dv].rx || 0); rx += m; } if (rx >= 50) give('review50');
+      if (D.streak >= 7) give('streak7'); if (D.streak >= 14) give('streak14'); if (D.streak >= 30) give('streak30');
+      if (Object.keys(k.W).length >= 5) give('weekly5');
+      if (D.crowns >= 3) give('crowns3');
+      const pid = Kid.pid();
+      if (Prof.list().length > 1 && pid !== 'kt') {
+        const lg = App.league(); let goals = 0, run = 0, best = 0;
+        Object.keys(lg.weeks).map(Number).sort().forEach(w => { const W = lg.weeks[w]; const sum = Object.values(W).reduce((a, b) => a + b, 0); if (sum >= lg.goal && W[pid]) goals++; if (w < lg.cur) { const r = Object.entries(W).sort((a, b) => b[1] - a[1]); const win = r[0] && r[0][0] === pid && (!r[1] || r[0][1] > r[1][1]); run = win ? run + 1 : 0; best = Math.max(best, run); } });
+        if (goals >= 5) give('goals5'); if (best >= 2) give('win2');
+      }
+      const tracks = {}; C.ctf.forEach(c => { tracks[c.track] = tracks[c.track] || [0, 0]; tracks[c.track][1]++; if (k.C[c.id] && k.C[c.id].d) tracks[c.track][0]++; });
+      for (const t in tracks) if (tracks[t][1] && tracks[t][0] === tracks[t][1]) give('tr_' + t);
+    } finally { App.amBusy = false; }
   },
   /* the player's chosen look (with safe defaults) */
   lookOf(k, night) {
@@ -152,7 +226,7 @@ const App = {
     return { cos: cat.cos.some(c => c[0] === v.cos) ? v.cos : cat.cos[0][0], col: cat.col.includes(v.col) ? v.col : cat.col[0], th: cat.th.some(t => t[0] === v.th) ? v.th : cat.th[0][0] };
   },
   look(night) { if (night == null) night = document.documentElement.dataset.stage === '2'; return App.lookOf(Kid.get(), night); },
-  lookOpen(req, D) { if (!req) return true; if (req.rank != null) return D.rank >= req.rank; if (req.crown) return D.crowns >= req.crown || D.king; if (req.flags) return D.solved.length >= req.flags; return true; },
+  lookOpen(req, D) { if (!req) return true; if (req.medal) return !!Kid.get().M[req.medal]; if (req.rank != null) return D.rank >= req.rank; if (req.crown) return D.crowns >= req.crown || D.king; if (req.flags) return D.solved.length >= req.flags; return true; },
   rankInfo(xp) { let r = 0; RANKS.forEach((x, i) => { if (xp >= x.x) r = i; }); const nx = RANKS[r + 1]; return { i: r, cur: RANKS[r], next: nx, pct: nx ? Math.round((xp - RANKS[r].x) / (nx.x - RANKS[r].x) * 100) : 100 }; },
   seenKey() { const pid = Kid.pid(); return pid ? pid + '.' + (Kid.get().g || 0) : null; },
   seen() { const sk = App.seenKey(); if (!sk) return null; const d = Dev.get(); d.seen = d.seen || {}; return d.seen[sk] || null; },
@@ -175,7 +249,7 @@ const App = {
     App.lessonKey = null; App.celeOK = true;
     let r = App.parse();
     const free = ['coach', 'coachsetup', 'who', 'newplayer'];
-    if (Kid.pid() && Kid.pid() !== 'demo' && !Prof.one(Kid.pid())) Kid.use(null);
+    if (Kid.pid() && Kid.pid() !== 'demo' && Kid.pid() !== 'kt' && !Prof.one(Kid.pid())) Kid.use(null);
     if (!App.preview && !free.includes(r[0])) {
       if (!Kid.pid()) r = ['who'];
       else if (!Kid.get().pledge) r = ['newplayer'];
@@ -191,7 +265,7 @@ const App = {
     const out = v(r, D) || {};
     const showTop = !['who', 'newplayer', 'lesson', 'test', 'review', 'typing', 'coachsetup'].includes(r[0]) && Kid.pid();
     const pv = App.preview && r[0] !== 'coach' && r[0] !== 'coachsetup';
-    app.innerHTML = (showTop ? App.topHtml(D) : '') + (pv ? '<div class="card" style="background:var(--warn-bg);padding:8px 12px;margin:6px 0">' + ic('eye', 18) + ' <b>وضع المعاينة:</b> ترى ما يراه ' + esc((Prof.one(Kid.pid()) || {}).name || 'لاعب جديد') + '، ولا يُسجَّل أي شيء. <button class="btn sm sec" data-act="preview-off">لوحة المدرب</button></div>' : '') + (out.html || '');
+    app.innerHTML = (showTop ? App.topHtml(D) : '') + (pv ? '<div class="card" style="background:var(--warn-bg);padding:8px 12px;margin:6px 0">' + ic('eye', 18) + ' <b>وضع المعاينة:</b> ترى ما يراه ' + esc(App.pname(Kid.pid())) + '، ولا يُسجَّل أي شيء. <button class="btn sm sec" data-act="preview-off">لوحة المدرب</button></div>' : '') + (out.html || '');
     App.paintTabs(r[0]);
     window.scrollTo(0, 0);
     if (out.mount) out.mount();
@@ -204,7 +278,9 @@ const App = {
     return '<header class="top"><a class="brand" href="#/map">' + Art.logo(night) + '<span>' + (night ? 'عُقاب 🌙' : 'عُقاب') + '</span></a><span class="sp"></span>' +
       '<span class="chip" title="سلسلة الأيام">' + ic('fire', 18) + '<span id="t-streak">' + D.streak + '</span></span>' +
       '<span class="chip" title="نقاط الخبرة">' + ic('star', 18) + '<span id="t-xp">' + D.xp + '</span></span>' +
-      '<button class="me-chip" data-act="switch" title="تبديل اللاعب">' + Art.eagle('happy', D.rank, night) + esc(p.name || '') + (D.king ? ' <span class="crown">👑</span>' : '') + '</button></header><div class="sync" id="sync"></div>';
+      '<button class="me-chip" data-act="switch" title="تبديل اللاعب">' + Art.eagle('happy', D.rank, night) + esc(App.pname(Kid.pid())) + (D.king ? ' <span class="crown">👑</span>' : '') + '</button></header>' +
+      (Kid.pid() === 'kt' && !App.preview ? '<div class="card" style="background:var(--warn-bg);padding:8px 12px;margin:4px 0;font-size:.9em">🧪 <b>حساب الاختبار:</b> محفوظ على هذا الجهاز فقط، ولا يدخل في المنافسة. <span class="row" style="display:inline-flex;gap:6px;margin-top:4px"><button class="btn sm sec" data-act="t-open">' + (Dev.get().testOpen ? '🔒 أعد القفل الطبيعي' : '🔓 افتح كل شيء') + '</button><button class="btn sm sec" data-act="t-reset">↺ ابدأ من الصفر</button></span></div>' : '') +
+      '<div class="sync" id="sync"></div>';
   },
   paintTop() { const D = App.derive(); const a = $('#t-xp'), b = $('#t-streak'); if (a) a.textContent = D.xp; if (b) b.textContent = D.streak; },
   paintSync() {
@@ -239,6 +315,8 @@ const App = {
       case 'preview-off': App.endPreview(); break;
       case 'cert': Cert.make(+v); break;
       case 'link': Views.linkDialog(); break;
+      case 't-open': Dev.set('testOpen', !Dev.get().testOpen); toast(Dev.get().testOpen ? 'فُتح كل شيء لحساب الاختبار 🔓' : 'عاد القفل الطبيعي 🔒'); App.render(); break;
+      case 't-reset': { const m = modal('<h2>ابدأ من الصفر؟</h2><p>يُمسح كل تقدّم حساب الاختبار على هذا الجهاز.</p><div class="row"><button class="btn bad" id="tr1">نعم</button><button class="btn sec" data-close>لا</button></div>'); $('#tr1', m.el).onclick = () => { m.close(); Kid.reset('kt'); const d = Dev.get(); Object.keys(d.seen || {}).forEach(x => { if (x.startsWith('kt')) delete d.seen[x]; }); Dev.set('testOpen', false); Kid.use('kt'); Kid.setName('المختبِر'); App.go('newplayer'); }; break; }
       case 'switch': if (App.preview) { App.endPreview(); break; } modal('<h2>تبديل اللاعب</h2><p>تريد الخروج ليلعب أخوك؟ تقدّمك محفوظ.</p><div class="row"><button class="btn" id="swy">نعم، خروج</button><button class="btn sec" data-close>لا</button></div>').el.querySelector('#swy').onclick = () => { $('.modal').remove(); Kid.use(null); App.go('who'); }; break;
     }
   },
@@ -323,11 +401,11 @@ const App = {
 };
 
 /* ---------- lookups ---------- */
-function unitById(id) { return id === 'final' ? C.final : C.units.find(u => u.id === id); }
+function unitById(id) { return C.units.find(u => u.id === id); }
 const QIDX = {};
 function buildIndex() {
   const add = (u) => u.lessons.forEach(l => l.steps.forEach((s, i) => { if (s.t === 'q' || s.t === 'in') QIDX[u.id + '.' + l.id + '.' + i] = { s, u, l }; }));
-  C.units.forEach(add); if (C.final) add(C.final);
+  C.units.forEach(add);
   C.units.forEach(u => (u.test || []).forEach((s, i) => { QIDX[u.id + '.t.' + i] = { s, u, l: null }; }));
 }
 
@@ -338,7 +416,7 @@ const Views = {
     const ps = Prof.list(); const fam = Dev.get().fam; const lg = ps.length > 1 ? App.league() : null;
     let h = '<div style="padding-top:16px;text-align:center">' + Art.eagle('happy', 2, false, { cos: 'classic', col: 'blue' }).replace('class="eagle"', 'class="eagle" style="width:120px"') + '<h1 style="margin:0">' + (ps.length ? 'من سيلعب الآن؟' : 'أهلاً بك في عُقاب!') + '</h1></div>';
     if (!fam) h += '<div class="card"><h3 style="margin-top:0">🔗 رمز الربط من أخيك الكبير</h3><p class="muted" style="margin:0 0 8px">اكتبه مرة واحدة على هذا الجهاز ليظهر حسابك وتقدّمك، ويتابعك أخوك.</p><div class="row" style="flex-wrap:nowrap"><input class="inp mono" id="wfam" dir="ltr" placeholder="XXXX-XXXX-XXXX"><button class="btn" id="wfb">ربط</button></div><p id="wfm" class="muted" style="font-size:.85em;margin:4px 0 0"></p></div>';
-    h += '<div class="players">' + ps.map(p => { const k = Kid.of(p.id); const D = App.derive(p.id); return '<div class="player" data-p="' + p.id + '" role="button" tabindex="0">' + Art.eagle('happy', D.rank, false, App.lookOf(k, false)) + '<b>' + esc(p.name) + (lg && lg.king === p.id ? ' 👑' : '') + '</b><small class="muted">' + esc(RANKS[D.rank].n) + '</small></div>'; }).join('') +
+    h += '<div class="players">' + ps.map(p => { const k = Kid.of(p.id); const D = App.derive(p.id); return '<div class="player" data-p="' + p.id + '" role="button" tabindex="0">' + Art.eagle('happy', D.rank, false, App.lookOf(k, false)) + '<b>' + esc(p.name) + (lg && lg.king === p.id ? ' 👑' : '') + '</b><small class="muted">' + esc(App.titleOf(k)) + ' · ' + esc(RANKS[D.rank].n) + '</small></div>'; }).join('') +
       (Prof.freeId() && ps.length < 4 ? '<div class="player add" data-new="1" role="button" tabindex="0"><span style="font-size:40px">＋</span>لاعب جديد</div>' : '') + '</div>';
     h += '<div class="sync" id="sync" style="justify-content:center"></div><div style="text-align:center;margin-top:22px"><a class="btn sec" href="#/coach">' + ic('lock', 20) + 'لوحة المدرب</a></div>';
     return {
@@ -420,7 +498,7 @@ const Views = {
     h += '<h3>🖌️ ألوان الصفحة</h3><div class="picks">' + cat.th.map(t => '<button class="pick' + (L.th === t[0] ? ' on' : '') + '" data-lk="' + s + '" data-k="th" data-v="' + t[0] + '" data-open="1"><span class="sw">' + TH[t[0]].map(c => '<i style="background:' + c + '"></i>').join('') + '</span>' + t[1] + '</button>').join('') + '</div></div>';
     return h;
   },
-  reqText(r) { if (!r) return ''; if (r.rank != null) return 'يُفتح عند رتبة «' + RANKS[r.rank].n + '»'; if (r.crown) return 'يُفتح عندما تصبح بطل الأسبوع 👑'; if (r.flags) return 'يُفتح بعد ' + r.flags + ' أعلام'; return ''; },
+  reqText(r) { if (!r) return ''; if (r.medal) return 'يُفتح بميدالية «' + MEDALS[r.medal].n + '»'; if (r.rank != null) return 'يُفتح عند رتبة «' + RANKS[r.rank].n + '»'; if (r.crown) return 'يُفتح عندما تصبح بطل الأسبوع 👑'; if (r.flags) return 'يُفتح بعد ' + r.flags + ' أعلام'; return ''; },
   mountPickers() {
     $$('.pick[data-lk]').forEach(b => b.onclick = () => {
       if (b.dataset.open !== '1') { Snd.bad(); toast('🔒 ' + b.dataset.req); return; }
@@ -431,9 +509,11 @@ const Views = {
   look(r, D) {
     let h = '<div class="row" style="margin:6px 0"><a class="btn sm sec" href="#/me">' + ic('back', 18) + 'ملفي</a></div><h1>👕 خزانتي</h1><p class="muted">اختر شكل عُقاب وألوانه، وألوان صفحتك. أزياء جديدة تُفتح كلما تقدّمت.</p>';
     h += '<div style="text-align:center">' + Art.eagle('happy', D.rank, false).replace('class="eagle"', 'class="eagle" style="width:120px"') + (D.stage2 ? Art.eagle('happy', D.rank, true).replace('class="eagle"', 'class="eagle" style="width:120px"') : '') + '</div>';
+    const curT = (Kid.get().look && Kid.get().look.title) || 't0';
+    h += '<div class="card"><h3 style="margin-top:0">🏷️ لقبي <small class="muted">(يظهر تحت اسمك)</small></h3><div class="tagbox">' + TITLES.map(t => { const open = !t[2] || !!Kid.get().M[t[2].medal]; return '<button class="tag' + (curT === t[0] ? ' sel' : '') + '" data-title="' + t[0] + '" data-open="' + (open ? 1 : 0) + '" data-req="' + esc(t[2] ? 'يُفتح بميدالية «' + MEDALS[t[2].medal].n + '»' : '') + '">' + (open ? '' : '🔒 ') + esc(t[1]) + '</button>'; }).join('') + '</div></div>';
     h += Views.lookPickers(false, D);
     h += D.stage2 ? Views.lookPickers(true, D) : '<div class="card" style="opacity:.7"><h3 style="margin-top:0">🌙 الخزانة الليلية</h3><p class="muted" style="margin:0">أزياء وألوان خاصة بالمرحلة الثانية (النينجا، صاحب القلنسوة، السايبورغ، الظل...). تُفتح مع صيد الأعلام.</p></div>';
-    return { html: h, mount() { Views.mountPickers(); } };
+    return { html: h, mount() { Views.mountPickers(); $$('[data-title]').forEach(b => b.onclick = () => { if (b.dataset.open !== '1') { Snd.bad(); toast('🔒 ' + b.dataset.req); return; } Kid.setLook({ title: b.dataset.title }); Snd.ok(); App.render(); }); } };
   },
   /* ---------- family league ---------- */
   league(r, D) {
@@ -442,7 +522,7 @@ const Views = {
     const max = Math.max(50, ...rows.map(x => x.w));
     const ws = new Date(lg.cur), we = new Date(lg.cur + 6 * 864e5);
     let h = '<h1>🏆 لوحة الأبطال</h1><p class="muted">سباق هذا الأسبوع (' + ws.getDate() + ' ' + MONTHS[ws.getMonth()] + ' ← ' + we.getDate() + ' ' + MONTHS[we.getMonth()] + '). من يجمع أكثر نقاط حتى نهاية الجمعة يلبس <b>التاج 👑</b> طوال الأسبوع القادم!</p>';
-    h += '<div class="card">' + rows.map((x, i) => '<div class="league-row">' + '<b style="font-size:1.4em;width:28px;text-align:center">' + (i === 0 && x.w ? '🥇' : i === 1 && x.w ? '🥈' : (i + 1)) + '</b>' + Art.eagle('happy', x.d.rank, false, App.lookOf(x.k, false)) + '<div style="flex:1"><b>' + esc(x.p.name) + (lg.king === x.p.id ? ' <span class="crown">👑</span>' : '') + (x.p.id === Kid.pid() ? ' <small class="muted">(أنت)</small>' : '') + '</b><div class="bar"><i style="width:' + Math.round(x.w / max * 100) + '%"></i></div><small class="muted"><bdi>' + x.w + ' XP</bdi> هذا الأسبوع</small></div></div>').join('') + '</div>';
+    h += '<div class="card">' + rows.map((x, i) => '<div class="league-row">' + '<b style="font-size:1.4em;width:28px;text-align:center">' + (i === 0 && x.w ? '🥇' : i === 1 && x.w ? '🥈' : (i + 1)) + '</b>' + Art.eagle('happy', x.d.rank, false, App.lookOf(x.k, false)) + '<div style="flex:1"><b>' + esc(x.p.name) + (lg.king === x.p.id ? ' <span class="crown">👑</span>' : '') + (x.p.id === Kid.pid() ? ' <small class="muted">(أنت)</small>' : '') + ' <small class="muted">· ' + esc(App.titleOf(x.k)) + '</small></b><div class="bar"><i style="width:' + Math.round(x.w / max * 100) + '%"></i></div><small class="muted"><bdi>' + x.w + ' XP</bdi> هذا الأسبوع</small></div></div>').join('') + '</div>';
     const gp = Math.min(100, Math.round(lg.sumNow / lg.goal * 100));
     h += '<div class="card" style="border-color:var(--gold)"><h3 style="margin-top:0">🤝 هدف الإخوة المشترك</h3><p style="margin:0">اجمعوا معاً <b><bdi>' + lg.goal + ' XP</bdi></b> هذا الأسبوع، فيحصل <b>كل من شارك</b> على <b>+30 XP</b> هدية!</p><div class="bar" style="height:18px;margin-top:8px"><i style="width:' + gp + '%"></i></div><small class="muted"><bdi>' + lg.sumNow + ' / ' + lg.goal + '</bdi> ' + (lg.sumNow >= lg.goal ? '✅ تحقّق الهدف!' : '') + '</small></div>';
     h += '<div class="sec-h"><h2>المقارنة الكاملة</h2></div><table class="t"><thead><tr><th></th>' + rows.map(x => '<th>' + esc(x.p.name) + '</th>').join('') + '</tr></thead><tbody>' +
@@ -478,19 +558,21 @@ const Views = {
     const curU = C.units.find(u => D.st[u.id].open && !D.st[u.id].passed);
     const greet = k.name ? 'يا ' + esc(k.name) : 'يا بطل';
     let h = '<div class="hero">' + Art.eagle('happy', ri.i, night) + '<div class="bubble">' + (curU ? 'أهلاً ' + greet + '! نكمل اليوم في <b>' + esc(curU.title) + '</b>.' : D.stage2 ? 'أهلاً ' + greet + '! الأعلام تنتظرك في تبويب «الأعلام».' : 'أهلاً ' + greet + '!') + '<div class="bar" style="margin-top:8px"><i style="width:' + ri.pct + '%"></i></div><small class="muted">' + esc(ri.cur.n) + (ri.next ? ' ← ' + esc(ri.next.n) + ' (باقي <bdi>' + (ri.next.x - D.xp) + ' XP</bdi>)' : '') + '</small></div></div>';
-    h += '<div class="stage-h">المرحلة الأولى: الأساسيات</div><div class="path">';
+    const PARTS = { 1: 'المرحلة الأولى · الجزء ١: الأساسيات', 2: 'المرحلة الأولى · الجزء ٢: التعمّق' };
+    let part = 0, n = 0;
     C.units.forEach((u, i) => {
+      if ((u.part || 1) !== part) { if (part) h += '</div>'; part = u.part || 1; h += '<div class="stage-h">' + PARTS[part] + '</div><div class="path">'; }
+      if (!u.project) n++;
       const s = D.st[u.id];
       const cls = !s.open ? 'locked' : s.passed ? 'done' : (u === curU ? 'cur' : '');
       const pct = Math.round((s.ld / s.total) * 100);
-      h += '<a class="unit ' + cls + '" href="' + (s.open ? '#/unit/' + u.id : 'javascript:void 0') + '" data-locked="' + (!s.open ? 1 : 0) + '"><div class="ic">' + u.icon + '</div><div class="tx"><small>الوحدة ' + (i + 1) + '</small><b>' + esc(u.title) + '</b>' +
-        (s.open ? '<div class="bar"><i style="width:' + (s.passed ? 100 : pct) + '%"></i></div><small>' + (s.passed ? '✅ أتقنتها (' + s.best + '%)' : s.ld + ' من ' + s.total + ' دروس') + '</small>' : '<small>🔒 أتقن الوحدة السابقة لتفتحها</small>') + '</div></a>';
+      const stars = u.project ? '' : ' <span class="stars">' + '★'.repeat(s.stars) + '<i>' + '★'.repeat(3 - s.stars) + '</i></span>';
+      h += '<a class="unit ' + cls + (u.project ? ' proj' : '') + '" href="' + (s.open ? '#/unit/' + u.id : 'javascript:void 0') + '" data-locked="' + (!s.open ? 1 : 0) + '"><div class="ic">' + u.icon + '</div><div class="tx"><small>' + (u.project ? '⭐ مشروع كبير' : 'الوحدة ' + n) + (s.passed ? stars : '') + '</small><b>' + esc(u.title) + '</b>' +
+        (s.open ? '<div class="bar"><i style="width:' + (s.passed ? 100 : pct) + '%"></i></div><small>' + (s.passed ? (u.project ? '✅ أنجزته' : '✅ أتقنتها (' + s.best + '%)' + (s.stars < 3 ? ' · أعد الاختبار لتجمع النجوم' : ' · أعلى درجة!')) : s.ld + ' من ' + s.total + (u.project ? ' مهام' : ' دروس')) + '</small>' : '<small>🔒 ' + (u.project ? 'بعد إتقان الوحدات السابقة' : 'أتقن الوحدة السابقة لتفتحها') + '</small>') + '</div></a>';
     });
-    const f = D.st.final;
-    if (C.final) h += '<a class="unit ' + (!f.open ? 'locked' : f.passed ? 'done' : 'cur') + '" href="' + (f.open ? '#/unit/final' : 'javascript:void 0') + '"><div class="ic">⭐</div><div class="tx"><small>مشروع نهاية المرحلة</small><b>' + esc(C.final.title) + '</b>' + (f.open ? '<small>' + (f.passed ? '✅ أنجزته' : f.ld + ' من ' + f.total + ' مهام') + '</small>' : '<small>🔒 بعد إتقان كل الوحدات</small>') + '</div></a>';
     h += '</div>';
     h += '<div class="stage-h">المرحلة الثانية: صيد الأعلام</div>';
-    h += D.stage2 ? '<a class="unit cur" href="#/ctf"><div class="ic">🚩</div><div class="tx"><b>تحديات الأعلام (CTF)</b><small>' + D.solved.length + ' من ' + C.ctf.length + ' أعلام</small></div></a>' : '<div class="unit locked"><div class="ic">🚩</div><div class="tx"><b>تحديات الأعلام (CTF)</b><small>🔒 تُفتح بعد مشروع المرحلة الأولى</small></div></div>';
+    h += D.stage2 ? '<a class="unit cur" href="#/ctf"><div class="ic">🚩</div><div class="tx"><b>تحديات الأعلام (CTF)</b><small>' + D.solved.length + ' من ' + C.ctf.length + ' أعلام</small></div></a>' : '<div class="unit locked"><div class="ic">🚩</div><div class="tx"><b>تحديات الأعلام (CTF)</b><small>🔒 تُفتح بعد المشروع الكبير الثاني</small></div></div>';
     return { html: h, mount() { $$('[data-locked="1"]').forEach(a => a.onclick = e => { e.preventDefault(); Snd.bad(); toast('🔒 أتقن الوحدة السابقة أولاً (80% في اختبارها)'); }); } };
   },
 
@@ -507,7 +589,7 @@ const Views = {
       h += '<a class="unit ' + (done ? 'done' : open ? 'cur' : 'locked') + '" href="' + (open ? '#/lesson/' + u.id + '/' + l.id : 'javascript:void 0') + '"><div class="ic" style="font-size:22px;font-weight:800">' + (done ? '✅' : (i + 1)) + '</div><div class="tx"><b>' + esc(l.title) + '</b><small>' + (done ? 'أنهيته · يمكنك إعادته' : open ? (l.mins || 10) + ' دقائق تقريباً' : '🔒 أنهِ الدرس السابق') + '</small></div></a>';
       prevDone = done;
     });
-    if (u.id !== 'final') {
+    if (!u.project) {
       const allDone = s.ld === s.total;
       h += '<div class="card" style="text-align:center"><h2>🏅 اختبار الإتقان</h2><p>' + (s.passed ? 'أتقنت هذه الوحدة! أفضل نتيجة: <b>' + s.best + '%</b>' : 'تحتاج <b>80%</b> لتفتح الوحدة التالية.' + (s.best ? ' أفضل نتيجة حتى الآن: ' + s.best + '%' : '')) + '</p>' +
         (allDone || s.ov === 'open' ? '<a class="btn ' + (s.passed ? 'sec' : 'gold') + '" href="#/test/' + u.id + '">' + (s.passed ? 'أعد الاختبار' : 'ابدأ الاختبار') + '</a>' : '<p class="muted">🔒 أنهِ كل الدروس أولاً</p>') + '</div>';
@@ -548,10 +630,10 @@ const Views = {
   },
   nextLesson(D) {
     const k = Kid.get();
-    for (const u of C.units.concat(C.final ? [C.final] : [])) {
+    for (const u of C.units) {
       const s = D.st[u.id]; if (!s || !s.open) continue;
       for (const l of u.lessons) if (!(k.L[u.id + '.' + l.id] && k.L[u.id + '.' + l.id].d)) return { title: l.title, href: '#/lesson/' + u.id + '/' + l.id };
-      if (u.id !== 'final' && !s.passed) return { title: 'اختبار إتقان: ' + u.title, href: '#/test/' + u.id };
+      if (!u.project && !s.passed) return { title: 'اختبار إتقان: ' + u.title, href: '#/test/' + u.id };
     }
     return null;
   },
@@ -576,7 +658,7 @@ const Views = {
 
   me(r, D) {
     const k = Kid.get(); const ri = App.rankInfo(D.xp); const d = Dev.get();
-    let h = '<div class="card hatbox">' + Art.hat(ri.i) + '<h1 style="margin:0">' + esc(k.name || 'البطل') + (D.king ? ' 👑' : '') + '</h1><p style="margin:0"><b>' + esc(ri.cur.n) + '</b> · <bdi>' + D.xp + ' XP</bdi></p><div class="bar" style="width:100%;max-width:340px"><i style="width:' + ri.pct + '%"></i></div><small class="muted">' + (ri.next ? 'باقي <bdi>' + (ri.next.x - D.xp) + ' XP</bdi> على «' + esc(ri.next.n) + '»' : 'وصلت لأعلى رتبة!') + '</small></div>';
+    let h = '<div class="card hatbox">' + Art.hat(ri.i) + '<h1 style="margin:0">' + esc(k.name || 'البطل') + (D.king ? ' 👑' : '') + '</h1><p style="margin:0;color:var(--primary);font-weight:800">🏷️ ' + esc(App.titleOf(k)) + '</p><p style="margin:0"><b>' + esc(ri.cur.n) + '</b> · <bdi>' + D.xp + ' XP</bdi></p><div class="bar" style="width:100%;max-width:340px"><i style="width:' + ri.pct + '%"></i></div><small class="muted">' + (ri.next ? 'باقي <bdi>' + (ri.next.x - D.xp) + ' XP</bdi> على «' + esc(ri.next.n) + '»' : 'وصلت لأعلى رتبة!') + '</small></div>';
     h += '<div class="grid2"><a class="btn gold" href="#/look">👕 خزانتي (الأشكال والألوان)</a><a class="btn sec" href="#/glossary">' + ic('book', 20) + 'قاموسي</a></div>';
     h += '<div class="sec-h"><h2>الرتب</h2></div><div class="ranks">' + RANKS.map((x, i) => '<div class="rk ' + (i === ri.i ? 'cur' : i > ri.i ? 'no' : '') + '">' + (i <= ri.i ? '🎩' : '🔒') + ' ' + esc(x.n) + '<span class="sp" style="flex:1"></span><small>' + x.x + ' XP</small></div>').join('') + '</div>';
     h += '<div class="sec-h"><h2>الميداليات</h2><small class="muted">' + Object.keys(k.M).filter(m => MEDALS[m]).length + ' من ' + Object.keys(MEDALS).length + '</small></div>';
@@ -585,7 +667,7 @@ const Views = {
       h += '<h3 style="color:' + DOMAINS[dm][1] + '">' + DOMAINS[dm][0] + '</h3><div class="medals">' + ms.map(m => '<div class="medal ' + (k.M[m] ? '' : 'no') + '">' + Art.medal(MEDALS[m].ic, DOMAINS[dm][1], !!k.M[m]) + '<b>' + esc(MEDALS[m].n) + '</b><small>' + esc(MEDALS[m].how) + '</small></div>').join('') + '</div>';
     }
     h += '<div class="sec-h"><h2>الشهادات</h2></div><div class="card">' +
-      (k.X.final ? '<button class="btn gold" data-act="cert" data-v="1">' + ic('dl', 20) + 'شهادة المرحلة الأولى (PDF)</button>' : '<p class="muted">🔒 شهادة المرحلة الأولى: بعد مشروع نهاية المرحلة.</p>') +
+      (k.X.p_final2 ? '<button class="btn gold" data-act="cert" data-v="1">' + ic('dl', 20) + 'شهادة المرحلة الأولى (PDF)</button>' : '<p class="muted">🔒 شهادة المرحلة الأولى: بعد المشروع الكبير الثاني.</p>') +
       (D.solved.length >= C.ctf.length && C.ctf.length ? ' <button class="btn gold" data-act="cert" data-v="2">' + ic('dl', 20) + 'شهادة المرحلة الثانية (PDF)</button>' : '<p class="muted">🔒 شهادة المرحلة الثانية: بعد التقاط كل الأعلام.</p>') + '</div>';
     h += '<div class="sec-h"><h2>الإعدادات</h2></div><div class="card"><div class="row"><button class="btn sec" data-act="sound">' + ic(d.sound ? 'sound' : 'mute', 20) + (d.sound ? 'الصوت يعمل' : 'الصوت مكتوم') + '</button><button class="btn sec" data-act="big">' + (d.big ? 'خط عادي' : 'خط كبير') + '</button><button class="btn sec" data-act="link">🔗 ' + (d.fam ? 'رمز الربط: <span class="mono">' + esc(d.fam) + '</span>' : 'إضافة رمز الربط') + '</button></div><p class="muted" style="font-size:.85em;margin-top:10px">رقم هذا الجهاز: <span class="mono">' + esc(d.id) + '</span></p></div>';
     return { html: h };
@@ -650,13 +732,13 @@ const Lesson = {
   finish() {
     const L = Lesson.cur; const first = Kid.lessonDone(L.key, L.l.title);
     if (L.l.medal) Kid.medal(L.l.medal);
-    if (L.u.id === 'final' && L.u.lessons.every(x => Kid.get().L['final.' + x.id] && Kid.get().L['final.' + x.id].d)) { if (Kid.flag('final')) Kid.medal('stage1'); }
+    if (L.u.project && L.u.lessons.every(x => Kid.get().L[L.u.id + '.' + x.id] && Kid.get().L[L.u.id + '.' + x.id].d)) { if (Kid.flag(L.u.id === 'final' ? 'final' : 'p_' + L.u.id) && L.u.doneMedal) Kid.medal(L.u.doneMedal); }
     const D = App.derive(); const gain = D.xp - L.xpBefore;
     const idx = L.u.lessons.indexOf(L.l); const nx = L.u.lessons[idx + 1];
     const night = document.documentElement.dataset.stage === '2';
     App.lessonKey = null; App.celeOK = true;
     $('#lesson').innerHTML = '<div style="text-align:center;padding-top:30px">' + Art.eagle('happy', D.rank, night).replace('class="eagle"', 'class="eagle" style="width:150px"') + '<h1>أحسنت!</h1><p>أنهيت درس «' + esc(L.l.title) + '»</p>' + (gain > 0 ? '<p class="big-num"><bdi>+' + gain + ' XP</bdi></p>' : '<p class="muted">راجعت الدرس مرة أخرى. ممتاز!</p>') +
-      '<div class="row" style="justify-content:center">' + (nx ? '<a class="btn" href="#/lesson/' + L.u.id + '/' + nx.id + '">الدرس التالي</a>' : (L.u.id !== 'final' ? '<a class="btn gold" href="#/test/' + L.u.id + '">اختبار الإتقان</a>' : '<a class="btn gold" href="#/map">الرحلة</a>')) + '<a class="btn sec" href="#/unit/' + L.u.id + '">قائمة الدروس</a></div></div>';
+      '<div class="row" style="justify-content:center">' + (nx ? '<a class="btn" href="#/lesson/' + L.u.id + '/' + nx.id + '">الدرس التالي</a>' : (!L.u.project ? '<a class="btn gold" href="#/test/' + L.u.id + '">اختبار الإتقان</a>' : '<a class="btn gold" href="#/map">الرحلة</a>')) + '<a class="btn sec" href="#/unit/' + L.u.id + '">قائمة الدروس</a></div></div>';
     if (first) { Snd.win(); confetti(70); }
     setTimeout(App.checkCele, 900);
   }
@@ -762,14 +844,15 @@ const Test = {
   },
   finish() {
     const T = Test.cur; const sc = Math.round(T.right / T.qs.length * 100); const pass = sc >= 80;
-    const wasPassed = !!(Kid.get().T[T.u.id] && Kid.get().T[T.u.id].p);
+    const wasPassed = !!(Kid.get().T[T.u.id] && Kid.get().T[T.u.id].p); const firstTry = !Kid.get().T[T.u.id];
     Kid.testDone(T.u.id, sc, T.qs.length, T.wrong.filter(Boolean));
+    if (sc === 100 && firstTry) Kid.medal('perfect');
     const D = App.derive(); const gain = D.xp - T.xpBefore;
     App.celeOK = true;
     const idx = C.units.indexOf(T.u); const nu = C.units[idx + 1];
     const tags = uniq(T.wrong.filter(Boolean));
     let h = '<div style="text-align:center;padding-top:24px">' + Art.eagle(pass ? 'happy' : 'think', D.rank).replace('class="eagle"', 'class="eagle" style="width:140px"') +
-      '<h1>' + (pass ? (wasPassed ? 'ممتاز مرة أخرى!' : 'أتقنت الوحدة!') : 'اقتربت!') + '</h1><p class="big-num">' + sc + '%</p><p>' + T.right + ' من ' + T.qs.length + ' إجابات صحيحة</p>' + (gain > 0 ? '<p><b style="color:var(--gold)"><bdi>+' + gain + ' XP</bdi></b></p>' : '');
+      '<h1>' + (pass ? (wasPassed ? 'ممتاز مرة أخرى!' : 'أتقنت الوحدة!') : 'اقتربت!') + '</h1><p class="big-num">' + sc + '%</p><div class="stars big">' + '★'.repeat(sc >= 100 ? 3 : sc >= 90 ? 2 : sc >= 80 ? 1 : 0) + '<i>' + '★'.repeat(3 - (sc >= 100 ? 3 : sc >= 90 ? 2 : sc >= 80 ? 1 : 0)) + '</i></div><p>' + T.right + ' من ' + T.qs.length + ' إجابات صحيحة</p>' + (gain > 0 ? '<p><b style="color:var(--gold)"><bdi>+' + gain + ' XP</bdi></b></p>' : '');
     if (pass) h += !wasPassed && nu ? '<p>فُتحت لك الوحدة التالية: <b>' + esc(nu.title) + '</b> 🔓</p><a class="btn gold" href="#/unit/' + nu.id + '">ادخلها الآن</a>' : '<a class="btn" href="#/map">الرحلة</a>';
     else h += '<p>تحتاج 80% على الأقل. لا بأس! راجع هذه الأفكار ثم حاول مرة أخرى:</p>' + (tags.length ? '<div class="tagbox" style="justify-content:center">' + tags.map(t => '<span class="tag">' + esc(t) + '</span>').join('') + '</div>' : '') + '<div class="row" style="justify-content:center"><a class="btn" href="#/test/' + T.u.id + '">حاول مرة أخرى</a><a class="btn sec" href="#/unit/' + T.u.id + '">راجع الدروس</a></div>';
     h += '</div>';
@@ -848,7 +931,7 @@ const Typing = {
     const T = Typing.cur; clearInterval(T.timer); const wpm = Math.round(T.typed / 5);
     $('#ti').disabled = true;
     Kid.typing(wpm); const first = Kid.task('typing');
-    if (wpm >= 25) Kid.medal('typer');
+    if (wpm >= 25) Kid.medal('typer'); if (wpm >= 40) Kid.medal('typer40');
     $('#tyres').innerHTML = '<div class="card" style="text-align:center"><h2>انتهى الوقت!</h2><p class="big-num">' + wpm + ' كلمة/دقيقة</p><p>' + T.ok + ' كلمة صحيحة · ' + T.errs + ' خطأ</p><p class="muted">الهدف: 25 كلمة في الدقيقة لميدالية «أصابع البرق» ⚡</p><div class="row" style="justify-content:center"><a class="btn" href="#/today">مهام اليوم</a><a class="btn sec" href="#/typing" onclick="setTimeout(()=>App.render(),0)">مرة أخرى</a></div></div>';
     if (first) { Snd.win(); confetti(50); }
     setTimeout(App.checkCele, 900);
@@ -877,7 +960,7 @@ const Cert = {
     else g.fillText('الاستطلاع · ثغرات الويب · كسر الشيفرات · تحليل الملفات', W / 2, 830);
     const D = App.derive();
     g.fillStyle = ink; g.font = '700 36px Tajawal, sans-serif'; g.fillText('الرتبة: ' + RANKS[D.rank].n + '   ·   ' + D.xp + ' نقطة خبرة', W / 2, 935);
-    const dt = stage === 1 ? k.X.final : Math.max(...D.solved.map(id => k.C[id].d));
+    const dt = stage === 1 ? k.X.p_final2 : Math.max(...D.solved.map(id => k.C[id].d));
     g.font = '500 32px Tajawal, sans-serif'; g.fillText('التاريخ: ' + fmtDay(dayKey(dt || now())) + ' ' + new Date(dt || now()).getFullYear(), W / 2, 995);
     const e = await Cert.svgImg(Art.eagle('happy', 6, night), 170, 170); if (e) { g.drawImage(e, 140, H - 330, 170, 170); g.drawImage(e, W - 310, H - 330, 170, 170); }
     g.font = '700 30px Tajawal, sans-serif'; g.fillText('المدرّب: أخوك الأكبر', W / 2, H - 170);

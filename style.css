@@ -332,3 +332,7 @@ table.t th{color:var(--muted);font-size:.85em}
 .crown{font-size:1.3em}
 .feed{font-size:.92em}
 .feed div{padding:5px 0;border-bottom:1px solid var(--line)}
+.stars{color:var(--gold);letter-spacing:1px;font-size:1.05em;white-space:nowrap}
+.stars i{font-style:normal;color:var(--line)}
+.stars.big{font-size:2em;text-align:center;line-height:1.2}
+.unit.proj{border-color:var(--gold);background:linear-gradient(135deg,var(--card) 70%,color-mix(in srgb,var(--gold) 18%,var(--card)))}

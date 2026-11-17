@@ -4,7 +4,11 @@ const TRACKS = [
   { id: 'recon', n: 'الاستطلاع', ic: '🔭', d: 'اجمع المعلومات مثل العُقاب من السماء' },
   { id: 'web', n: 'ثغرات الويب', ic: '🌐', d: 'مواقع وهمية فيها أخطاء حقيقية' },
   { id: 'crypto', n: 'كسر الشيفرات', ic: '🔐', d: 'رسائل مشفّرة ومرمّزة تنتظرك' },
-  { id: 'files', n: 'تحليل الملفات', ic: '🕵️', d: 'كل ملف يخفي قصة' }
+  { id: 'files', n: 'تحليل الملفات', ic: '🕵️', d: 'كل ملف يخفي قصة' },
+  { id: 'linux', n: 'خوادم لينكس', ic: '🐧', d: 'صلاحيات، ومستخدمون، وعمليات، وأنابيب' },
+  { id: 'code', n: 'قراءة الكود', ic: '🧾', d: 'اقرأ منطق البرنامج واكشف سرّه' },
+  { id: 'net', n: 'حزم الشبكة', ic: '📦', d: 'حلّل الحزم الملتقطة كالمحترفين' },
+  { id: 'case', n: 'القضايا الكبرى', ic: '🗂️', d: 'قصص تحقيق كاملة تجمع كل أدواتك' }
 ];
 const CTFTools = {
   ext(world = {}) {
@@ -124,7 +128,7 @@ const CTF = {
     const stub = { done() { }, fb: Lesson.fb, medal() { }, wrong() { }, card() { }, hint() { } };
     envs.forEach(e => {
       const box = document.createElement('div'); box.style.margin = '10px 0'; el.appendChild(box);
-      if (e.type === 'term') Term.create(box, { fs: e.fs, cwd: e.cwd, host: e.host, user: e.user, motd: e.motd || 'اكتب help لترى كل الأوامر (ومنها أدوات الصيد)', ext: CTFTools.ext(e.world) });
+      if (e.type === 'term') Term.create(box, { fs: e.fs, cwd: e.cwd, host: e.host, user: e.user, sudoers: e.sudoers, groups: e.groups, procs: e.procs, net: e.net, pw: e.pw, motd: e.motd || 'اكتب help لترى كل الأوامر (ومنها أدوات الصيد)', ext: CTFTools.ext(e.world) });
       else if (e.type === 'py') Py.exercise({ code: e.code, check: { any: 1 }, hint: e.hint }, box, stub);
       else Widgets.mount(e.w || e, box, stub);
     });

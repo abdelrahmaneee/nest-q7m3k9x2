@@ -210,7 +210,7 @@ const Widgets = {
       el.innerHTML = '<div class="browser"><div class="addr"><span>🌐</span><span class="mono" style="font-size:13px">' + esc(w.host || 'site.oqab') + '</span><input id="bu" value="' + esc(S.url) + '" spellcheck="false" autocapitalize="off"><button class="btn sm" id="bgo">اذهب</button></div>' +
         '<div class="row" style="padding:6px 8px;background:var(--bg);gap:6px">' + (w.src !== false ? '<button class="btn sm sec" id="bsrc">' + (S.showSrc ? '👁️ الصفحة' : '&lt;/&gt; عرض الكود') + '</button>' : '') + (w.cookieEdit ? '<button class="btn sm sec" id="bck">🍪 الكوكيز</button>' : '') + '</div>' +
         (S.showSrc ? '<div class="src">' + esc(pg.html).replace(/&lt;!--([\s\S]*?)--&gt;/g, '<span class="cm">&lt;!--$1--&gt;</span>') + '</div>' : '<iframe sandbox="" title="الموقع"></iframe>') + '<div id="bck2"></div></div>';
-      if (!S.showSrc) $('iframe', el).srcdoc = '<meta charset="utf-8"><style>body{font-family:Tajawal,system-ui,sans-serif;padding:12px;direction:rtl}input,button{font:inherit}</style>' + pg.html;
+      if (!S.showSrc) $('iframe', el).srcdoc = '<meta charset="utf-8"><style>body{font-family:Tajawal,system-ui,sans-serif;padding:12px;direction:rtl}input,button{font:inherit}</style>' + pg.html.replace(/<script[\s\S]*?<\/script>/gi, '');
       $('#bgo', el).onclick = () => { S.url = $('#bu', el).value.trim() || '/'; if (!S.url.startsWith('/')) S.url = '/' + S.url.replace(/^https?:\/\/[^/]+/, ''); Snd.click(); draw(); w.onNav && w.onNav(S, api); };
       $('#bu', el).onkeydown = e => { if (e.key === 'Enter') $('#bgo', el).click(); };
       const bs = $('#bsrc', el); if (bs) bs.onclick = () => { S.showSrc = !S.showSrc; draw(); if (S.showSrc) w.onSrc && w.onSrc(api); };
@@ -225,13 +225,13 @@ const Widgets = {
   /* ---- Caesar wheel ---- */
   caesar(w, el, api) {
     const AR = 'ابتثجحخدذرزسشصضطظعغفقكلمنهوي', EN = 'abcdefghijklmnopqrstuvwxyz';
-    const A = w.lang === 'en' ? EN : AR; let sh = w.shift0 || 0;
-    const shift = (t, k) => Array.from(t).map(ch => { const l = ch.toLowerCase(); const i = A.indexOf(l); if (i < 0) return ch; return A[(i + k % A.length + A.length) % A.length]; }).join('');
+    const A = w.lang === 'en' ? EN : AR; let sh = w.shift0 || 0, txt = w.text || '';
+    const shift = (t, k) => Array.from(t).map(ch => { const l = ch.toLowerCase(); const i = A.indexOf(l); if (i < 0) return ch; const r = A[(i + k % A.length + A.length) % A.length]; return ch !== l ? r.toUpperCase() : r; }).join('');
     const draw = () => {
       el.innerHTML = '<div class="wbox wheel-wrap"><div class="alpha">' + Array.from(A).map(c => '<span>' + c + '</span>').join('') + '</div><div style="font-size:1.4em">⬇️ إزاحة <b class="big-num" style="font-size:1.2em">' + sh + '</b></div><div class="alpha sh">' + Array.from(A).map((c, i) => '<span>' + A[(i + sh) % A.length] + '</span>').join('') + '</div>' +
         '<div class="row"><button class="btn sm sec" data-s="-1">−</button><input type="range" min="0" max="' + (A.length - 1) + '" value="' + sh + '" id="csr" style="width:180px"><button class="btn sm sec" data-s="1">+</button></div>' +
-        (w.secret ? '<div class="card" style="width:100%;margin:6px 0"><small class="muted">الرسالة السرية:</small><div style="font-size:1.3em;font-weight:800' + (w.lang === 'en' ? ';direction:ltr;font-family:var(--f-mono)' : '') + '">' + esc(w.secret) + '</div><small class="muted">بعد فكّها بالإزاحة ' + sh + ' (للخلف):</small><div style="font-size:1.3em;font-weight:800;color:var(--ok)' + (w.lang === 'en' ? ';direction:ltr;font-family:var(--f-mono)' : '') + '">' + esc(shift(w.secret, -sh)) + '</div></div>' : '<div style="width:100%"><input class="inp" id="cin" placeholder="اكتب رسالة لتشفيرها" value="' + esc(w.text || '') + '"><p>المشفّرة: <b id="cout" style="font-size:1.2em"></b></p></div>') + '</div>';
-      const cin = $('#cin', el); if (cin) { const up = () => { $('#cout', el).textContent = shift(cin.value, sh); }; cin.oninput = up; up(); }
+        (w.secret ? '<div class="card" style="width:100%;margin:6px 0"><small class="muted">الرسالة السرية:</small><div style="font-size:1.3em;font-weight:800' + (w.lang === 'en' ? ';direction:ltr;font-family:var(--f-mono)' : '') + '">' + esc(w.secret) + '</div><small class="muted">بعد فكّها بالإزاحة ' + sh + ' (للخلف):</small><div style="font-size:1.3em;font-weight:800;color:var(--ok)' + (w.lang === 'en' ? ';direction:ltr;font-family:var(--f-mono)' : '') + '">' + esc(shift(w.secret, -sh)) + '</div></div>' : '<div style="width:100%"><input class="inp' + (w.lang === 'en' ? ' mono" dir="ltr' : '') + '" id="cin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="' + (w.paste ? 'الصق الرسالة المشفّرة هنا' : 'اكتب رسالة لتشفيرها') + '" value="' + esc(txt) + '"><p>' + (w.paste ? 'بعد الإزاحة: ' : 'المشفّرة: ') + '<b id="cout" class="' + (w.lang === 'en' ? 'mono' : '') + '" style="font-size:1.2em;direction:ltr;unicode-bidi:isolate"></b></p></div>') + '</div>';
+      const cin = $('#cin', el); if (cin) { const up = () => { txt = cin.value; $('#cout', el).textContent = shift(cin.value, sh); }; cin.oninput = up; up(); }
       $('#csr', el).oninput = e => { sh = +e.target.value; draw(); check(); };
     };
     const check = () => { if (w.goalShift != null && sh === w.goalShift) { api.done(w.yes || 'فككت الشيفرة!'); if (w.medal) api.medal(w.medal); } else if (w.goal === 'any' && sh > 0) api.done(); };
@@ -320,5 +320,203 @@ const Widgets = {
   },
 
   /* ---- generic image/emoji card ---- */
-  card(w, el, api) { el.innerHTML = '<div class="wbox" style="text-align:center">' + (w.big ? '<div dir="ltr" style="font-size:44px;line-height:1.4;white-space:nowrap;overflow-x:auto">' + w.big + '</div>' : '') + (w.html || '') + '</div>'; api.done && api.done(); }
+  card(w, el, api) { el.innerHTML = '<div class="wbox" style="text-align:center">' + (w.big ? '<div dir="ltr" style="font-size:44px;line-height:1.4;white-space:nowrap;overflow-x:auto">' + w.big + '</div>' : '') + (w.html || '') + '</div>'; api.done && api.done(); },
+
+  /* ---- sorting game: swap neighbours until sorted ---- */
+  sortgame(w, el, api) {
+    let a = (w.nums || shuffle([3, 9, 1, 7, 4, 6])).slice(); while (a.every((x, i) => i === 0 || a[i - 1] <= x)) a = shuffle(a);
+    let swaps = 0, cmp = 0; let sel = null;
+    const draw = () => {
+      el.innerHTML = '<div class="wbox"><p style="margin-top:0">' + md(w.goalText || 'رتّب البطاقات من الأصغر إلى الأكبر. اضغط على بطاقتين **متجاورتين** لتبدّلهما.') + '</p><div class="row" style="justify-content:center;direction:ltr;gap:8px">' + a.map((x, i) => '<button class="tag' + (sel === i ? ' sel' : '') + '" data-i="' + i + '" style="font-size:1.6em;min-width:54px;min-height:70px">' + (w.labels ? w.labels[x] : x) + '</button>').join('') + '</div><p class="muted" style="text-align:center;margin:8px 0 0">التبديلات: <b>' + swaps + '</b></p></div>';
+    };
+    draw();
+    el.onclick = e => {
+      const b = e.target.closest('[data-i]'); if (!b) return; const i = +b.dataset.i;
+      if (sel === null) { sel = i; Snd.click(); draw(); return; }
+      if (Math.abs(sel - i) !== 1) { sel = i; Snd.click(); draw(); return; }
+      const [p, q] = [Math.min(sel, i), Math.max(sel, i)]; cmp++;
+      if (a[p] > a[q]) { [a[p], a[q]] = [a[q], a[p]]; swaps++; Snd.ok(); } else { Snd.bad(); api.fb(false, 'هاتان مرتّبتان أصلاً! بدّل فقط الجارتين اللتين الكبيرة فيهما على اليسار.'); }
+      sel = null; draw();
+      if (a.every((x, k) => k === 0 || a[k - 1] <= x)) { api.done(w.yes || 'رتّبتها بـ ' + swaps + ' تبديلات! هذه خوارزمية «الفقاعة»: كل مرة نبدّل جارتين حتى يكتمل الترتيب.'); if (w.medal) api.medal(w.medal); }
+    };
+  },
+
+  /* ---- binary search guessing game ---- */
+  guess(w, el, api) {
+    const max = w.max || 100; let secret = 1 + Math.floor(Math.random() * max), tries = 0, lo = 1, hi = max, log = [];
+    const draw = () => {
+      el.innerHTML = '<div class="wbox"><p style="margin-top:0">🤖 اخترت رقماً سرياً بين <b>1</b> و <b>' + max + '</b>. خمّنه! سأقول لك: أكبر أم أصغر.' + (w.limit ? ' الهدف: ' + w.limit + ' محاولات أو أقل.' : '') + '</p>' +
+        '<div class="meter" style="height:22px;position:relative;direction:ltr"><i style="position:absolute;left:' + ((lo - 1) / max * 100) + '%;width:' + ((hi - lo + 1) / max * 100) + '%;background:var(--ok)"></i></div><p class="muted" style="text-align:center;margin:4px 0">الرقم بين <b>' + lo + '</b> و <b>' + hi + '</b></p>' +
+        '<form class="row flagin"><input class="inp mono" type="number" min="1" max="' + max + '" id="gq" placeholder="?"><button class="btn">خمّن</button></form><div class="hexv" style="margin-top:8px;white-space:pre-wrap;min-height:30px">' + esc(log.join('\n')) + '</div></div>';
+      const f = $('form', el); const q = $('#gq', el); setTimeout(() => q.focus({ preventScroll: true }), 30);
+      f.onsubmit = e => { e.preventDefault(); const v = +q.value; if (!v) return; tries++;
+        if (v === secret) { log.push('🎯 ' + v + ' صحيح! بـ ' + tries + ' محاولات'); draw(); Snd.win(); if (!w.limit || tries <= w.limit) { api.done(w.yes || 'وجدته بـ ' + tries + ' محاولات! السر: كل مرة خمّن **المنتصف**، فيختفي نصف الأرقام دفعة واحدة. هذا «البحث الثنائي».'); if (w.medal) api.medal(w.medal); } else { api.fb(false, 'وجدته، لكن بأكثر من ' + w.limit + ' محاولات. السر: خمّن دائماً منتصف المجال الأخضر! جرّب مرة أخرى.'); setTimeout(() => { secret = 1 + Math.floor(Math.random() * max); tries = 0; lo = 1; hi = max; log = []; draw(); }, 1800); } return; }
+        if (v < secret) { lo = Math.max(lo, v + 1); log.push(v + ' ← أكبر ⬆️'); } else { hi = Math.min(hi, v - 1); log.push(v + ' ← أصغر ⬇️'); } Snd.click(); draw(); };
+    };
+    draw();
+  },
+
+  sqlRun(T, q) {
+      q = q.replace(/--[\s\S]*$/, '').replace(/\s+/g, ' ').trim().replace(/;$/, '').trim();
+      const m = q.match(/^select\s+(.+?)\s+from\s+(\w+)(?:\s+where\s+(.+?))?(?:\s+order\s+by\s+(\w+)(\s+desc|\s+asc)?)?(?:\s+limit\s+(\d+))?$/i);
+      if (!m) throw new Error('لم أفهم السؤال. الشكل: SELECT أعمدة FROM جدول WHERE شرط');
+      const tbl = T[m[2].toLowerCase()]; if (!tbl) throw new Error('لا يوجد جدول اسمه ' + m[2] + '. الجداول: ' + Object.keys(T).join('، '));
+      let rows = tbl.rows.map(r => Object.fromEntries(tbl.cols.map((c, i) => [c, r[i]])));
+      if (m[3]) {
+        const cond = m[3];
+        const one = (c) => { const x = c.trim().match(/^(\w+)\s*(=|!=|<>|>=|<=|>|<|like)\s*(.+)$/i); if (!x) { if (/^'?1'?\s*=\s*'?1'?$/.test(c.trim())) return () => true; throw new Error('شرط غير مفهوم: ' + c); } const col = x[1].toLowerCase(); if (!tbl.cols.includes(col)) throw new Error('لا يوجد عمود اسمه ' + x[1]); let v = x[3].trim(); const str = /^'.*'$/.test(v); v = str ? v.slice(1, -1) : +v; const op = x[2].toLowerCase(); return r => { const a = r[col]; if (op === '=') return a == v; if (op === '!=' || op === '<>') return a != v; if (op === '>') return a > v; if (op === '<') return a < v; if (op === '>=') return a >= v; if (op === '<=') return a <= v; if (op === 'like') return new RegExp('^' + String(v).replace(/%/g, '.*') + '$', 'i').test(a); }; };
+        const ors = cond.split(/\s+or\s+/i).map(o => o.split(/\s+and\s+/i).map(one));
+        rows = rows.filter(r => ors.some(ands => ands.every(f => f(r))));
+      }
+      if (m[4]) { const c = m[4].toLowerCase(); rows.sort((a, b) => a[c] > b[c] ? 1 : a[c] < b[c] ? -1 : 0); if (/desc/i.test(m[5] || '')) rows.reverse(); }
+      if (m[6]) rows = rows.slice(0, +m[6]);
+      const sel = m[1].trim();
+      if (/^count\(\*\)$/i.test(sel)) return { cols: ['count'], rows: [[rows.length]] };
+      const cols = sel === '*' ? tbl.cols : sel.split(',').map(x => x.trim().toLowerCase());
+      cols.forEach(c => { if (!tbl.cols.includes(c)) throw new Error('لا يوجد عمود اسمه ' + c + '. الأعمدة: ' + tbl.cols.join('، ')); });
+      return { cols, rows: rows.map(r => cols.map(c => r[c])) };
+  },
+  sqlTable(cols, rows) { return '<div style="overflow:auto"><table class="t ltr" style="direction:ltr"><thead><tr>' + cols.map(c => '<th>' + esc(c) + '</th>').join('') + '</tr></thead><tbody>' + rows.map(r => '<tr>' + r.map(v => '<td class="mono">' + esc(v) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>'; },
+
+  /* ---- tiny SQL playground (fake in-memory tables) ---- */
+  sql(w, el, api) {
+    const T = w.tables; const done = {};
+    const run = q => Widgets.sqlRun(T, q);
+    const tblHtml = (cols, rows) => '<div style="overflow:auto"><table class="t ltr" style="direction:ltr"><thead><tr>' + cols.map(c => '<th>' + esc(c) + '</th>').join('') + '</tr></thead><tbody>' + rows.map(r => '<tr>' + r.map(v => '<td class="mono">' + esc(v) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
+    el.innerHTML = '<div class="wbox">' + (w.show !== false ? Object.keys(T).map(n => '<p style="margin:0"><b>📋 جدول ' + esc(n) + '</b> <small class="muted">(' + T[n].rows.length + ' صفوف)</small></p>' + (w.preview ? tblHtml(T[n].cols, T[n].rows.slice(0, 4)) : '<p class="mono muted" style="margin:0 0 6px;direction:ltr;text-align:left">' + esc(T[n].cols.join(', ')) + '</p>')).join('') : '') +
+      (w.missions ? '<ul class="goals">' + w.missions.map((m, i) => '<li id="sq' + i + '"><i></i>' + md(m.d) + '</li>').join('') + '</ul>' : '') +
+      '<textarea class="inp mono" id="sqi" dir="ltr" rows="3" spellcheck="false" placeholder="SELECT * FROM ...">' + esc(w.start || '') + '</textarea><button class="btn sm" id="sqr" style="margin-top:6px">' + ic('play', 18) + 'نفّذ</button><div id="sqo" style="margin-top:8px"></div></div>';
+    $('#sqr', el).onclick = () => {
+      const q = $('#sqi', el).value; let r;
+      try { r = run(q); } catch (e) { $('#sqo', el).innerHTML = '<div class="feedback bad">⚠️ ' + esc(e.message) + '</div>'; Snd.bad(); return; }
+      $('#sqo', el).innerHTML = tblHtml(r.cols, r.rows) + '<p class="muted" style="margin:4px 0">' + r.rows.length + ' نتيجة</p>'; Snd.ok();
+      (w.missions || []).forEach((m, i) => { if (!done[i] && m.ok(r, q)) { done[i] = 1; const li = $('#sq' + i, el); li.classList.add('done'); $('i', li).textContent = '✓'; } });
+      if (w.missions && Object.keys(done).length === w.missions.length) { api.done(w.yes || 'أنجزت كل الأسئلة!'); if (w.medal) api.medal(w.medal); }
+    };
+    if (!w.missions) api.done();
+  },
+
+  /* ---- login form that builds SQL by gluing text (to show SQL injection) ---- */
+  sqli(w, el, api) {
+    const T = w.tables; let safe = false;
+    el.innerHTML = '<div class="wbox"><div class="browser"><div class="addr"><span>🔒</span><input value="https://game.oqab/login" readonly></div><div style="padding:12px;direction:rtl"><b>🎮 تسجيل الدخول</b><label style="display:block;margin-top:8px">اسم المستخدم<input class="inp mono" id="su" dir="ltr" autocomplete="off" autocapitalize="off" spellcheck="false" value="' + esc(w.user || '') + '"></label><label style="display:block;margin-top:6px">كلمة المرور<input class="inp mono" id="sp" dir="ltr" autocomplete="off" autocapitalize="off" spellcheck="false"></label><button class="btn sm" id="sgo" style="margin-top:8px">دخول</button></div></div>' +
+      '<p style="margin:10px 0 4px"><b>🔬 ما يرسله الخادم لقاعدة البيانات:</b></p><div class="hexv" id="sq" style="white-space:pre-wrap"></div>' + (w.fix ? '<label class="row" style="margin-top:8px;gap:6px"><input type="checkbox" id="sfx"> 🛡️ شغّل الحماية (الاستعلام المُعَدّ مسبقاً)</label>' : '') + '<div id="sres" style="margin-top:8px"></div></div>';
+    const build = () => { const u = $('#su', el).value, p = $('#sp', el).value; return safe ? "SELECT * FROM users WHERE username = ? AND password = ?\n   ← ? = " + JSON.stringify(u) + " , " + JSON.stringify(p) + '   (كنص فقط، لا يصبح أمراً أبداً)' : "SELECT * FROM users WHERE username = '" + u + "' AND password = '" + p + "'"; };
+    const up = () => { $('#sq', el).textContent = build(); }; up();
+    $('#su', el).oninput = up; $('#sp', el).oninput = up;
+    const fx = $('#sfx', el); if (fx) fx.onchange = () => { safe = fx.checked; up(); };
+    $('#sgo', el).onclick = () => {
+      const u = $('#su', el).value, p = $('#sp', el).value; let rows;
+      if (safe) { const t = T.users; rows = t.rows.filter(r => r[t.cols.indexOf('username')] === u && r[t.cols.indexOf('password')] === p).map(r => r); }
+      else { try { rows = Widgets.sqlRun(T, build()).rows; } catch (e) { $('#sres', el).innerHTML = '<div class="feedback bad">💥 خطأ في قاعدة البيانات: ' + esc(e.message) + '<div class="why">علامة التنصيص التي كتبتها كسرت الأمر! هذه أول علامة على وجود ثغرة حقن.</div></div>'; Snd.bad(); return; } }
+      if (!rows.length) { $('#sres', el).innerHTML = '<div class="feedback bad">❌ اسم المستخدم أو كلمة المرور خطأ</div>'; Snd.bad(); if (safe && /'/.test(p)) { api.done(w.yesFix || 'مع الحماية، كلامك بقي نصاً عادياً ولم يخدع قاعدة البيانات! 🛡️'); if (w.medalFix) api.medal(w.medalFix); } return; }
+      const name = rows[0][0 + T.users.cols.indexOf('username')];
+      $('#sres', el).innerHTML = '<div class="feedback ok">✅ أهلاً يا <b>' + esc(name) + '</b>' + (name === 'admin' ? ' 👑 (لوحة المدير مفتوحة!)' : '') + '</div>'; Snd.win();
+      if (name === 'admin' && !safe && /'/.test(p) && w.fix) api.fb(false, 'الحيلة ما زالت تعمل لأن الحماية مطفأة. شغّل الحماية ✅ ثم جرّب مرة أخرى.');
+      if (name === 'admin' && !safe && /'/.test(p) && !w.fix) { api.done(w.yes || 'دخلت كمدير دون أن تعرف كلمة المرور! هذا هو حقن SQL.'); if (w.medal) api.medal(w.medal); }
+    };
+  },
+
+  /* ---- comment box that shows script injection (XSS) inside a sealed frame ---- */
+  xss(w, el, api) {
+    let safe = false, hits = 0, safeTried = false;
+    el.innerHTML = '<div class="wbox"><div class="browser"><div class="addr"><span>🌐</span><input value="game.oqab/comments" readonly></div><iframe sandbox="allow-scripts" title="صفحة التعليقات" style="height:190px"></iframe></div>' +
+      '<div class="row" style="margin-top:8px"><input class="inp" id="xc" style="flex:1" dir="auto" autocomplete="off" spellcheck="false" placeholder="اكتب تعليقاً..."><button class="btn sm" id="xs">انشر</button></div>' + (w.fix ? '<label class="row" style="margin-top:8px;gap:6px"><input type="checkbox" id="xf"> 🛡️ شغّل الحماية (اعرض التعليق كنص فقط)</label>' : '') + '<div id="xr" style="margin-top:6px"></div></div>';
+    const fr = $('iframe', el); const list = (w.seed || ['لعبة رائعة! 👍', 'متى التحديث القادم؟']).map(x => esc(x));
+    const paint = () => { fr.srcdoc = '<meta charset="utf-8"><body style="font-family:Tajawal,sans-serif;direction:rtl;padding:8px;margin:0"><script>window.alert=function(m){parent.postMessage({oqab:"xss",m:String(m)},"*")};<\/script><b>💬 التعليقات</b>' + list.map(c => '<div style="border-bottom:1px solid #ddd;padding:6px 0">' + c + '</div>').join('') + '</body>'; };
+    paint();
+    const onMsg = e => { if (!el.isConnected) { window.removeEventListener('message', onMsg); return; } if (!e.data || e.data.oqab !== 'xss' || e.source !== fr.contentWindow) return; hits++; $('#xr', el).innerHTML = '<div class="feedback bad">⚡ تنبيه من داخل الصفحة: «' + esc(e.data.m) + '»<div class="why">كودك <b>نُفّذ</b> داخل الصفحة! لو كان مهاجماً، لسرق كوكيز كل من يفتح التعليقات.</div></div>'; Snd.bad(); if (!w.fix) { api.done(w.yes || 'هذه ثغرة حقن السكربت XSS!'); if (w.medal) api.medal(w.medal); } else api.fb(false, 'الكود نُفّذ لأن الحماية مطفأة. شغّل الحماية ✅ ثم انشر نفس الكود.'); };
+    window.addEventListener('message', onMsg);
+    const fx = $('#xf', el); if (fx) fx.onchange = () => { safe = fx.checked; };
+    $('#xs', el).onclick = () => {
+      const v = $('#xc', el).value; if (!v.trim()) return; $('#xr', el).innerHTML = '';
+      list.push(safe ? esc(v) : v); paint(); Snd.click();
+      if (w.fix && safe && /</.test(v)) { safeTried = true; setTimeout(() => { if (el.isConnected) { $('#xr', el).innerHTML = '<div class="feedback ok">🛡️ ظهر كودك كنص عادي ولم يُنفَّذ!</div>'; api.done(w.yesFix || 'الحماية تعمل: المتصفح عرض الكود كحروف فقط.'); if (w.medalFix) api.medal(w.medalFix); } }, 400); }
+    };
+  },
+
+  /* ---- file permissions editor (rwx) ---- */
+  perm(w, el, api) {
+    let p = (w.start || 'rw-r--r--').split('');
+    const who = [['👤 صاحب الملف', 'u'], ['👥 المجموعة', 'g'], ['🌍 الآخرون', 'o']];
+    const draw = () => {
+      const s = p.join(''); const oct = [0, 3, 6].map(i => (p[i] !== '-' ? 4 : 0) + (p[i + 1] !== '-' ? 2 : 0) + (p[i + 2] !== '-' ? 1 : 0)).join('');
+      el.innerHTML = '<div class="wbox"><p style="margin-top:0">' + md(w.goalText || '') + '</p><div class="grid2">' + who.map((x, j) => '<div class="bucket"><h4>' + x[0] + '</h4><div class="row" style="justify-content:center;direction:ltr">' + ['r', 'w', 'x'].map((b, k) => '<button class="tag' + (p[j * 3 + k] !== '-' ? ' right' : '') + '" data-b="' + (j * 3 + k) + '">' + { r: '📖 قراءة r', w: '✏️ كتابة w', x: '▶️ تشغيل x' }[b] + '</button>').join('') + '</div></div>').join('') + '</div>' +
+        '<p class="mono" style="text-align:center;font-size:1.4em;direction:ltr;margin:10px 0 0">' + esc(w.file || 'secret.txt') + ':  -' + s + '  =  <b>' + oct + '</b></p>' + (w.target ? '<button class="btn" id="pck" style="margin-top:8px">تحقّق</button>' : '') + '</div>';
+    };
+    draw();
+    el.onclick = e => {
+      const b = e.target.closest('[data-b]'); if (b) { const i = +b.dataset.b; p[i] = p[i] === '-' ? 'rwx'[i % 3] : '-'; Snd.click(); draw(); if (!w.target) api.done(); return; }
+      if (e.target.id === 'pck') { if (p.join('') === w.target) { api.done(w.yes || 'صلاحيات مضبوطة تماماً!'); if (w.medal) api.medal(w.medal); } else { api.wrong(); api.fb(false, w.hint || 'ليس بعد. راجع المطلوب.'); } }
+    };
+  },
+
+  /* ---- JavaScript sandbox: runs in an isolated frame, console.log captured ---- */
+  js(w, el, api) {
+    el.innerHTML = '<div class="pybox"><textarea spellcheck="false" autocapitalize="off" dir="ltr">' + esc(w.code || '') + '</textarea><div class="bar2"><button class="btn sm ok" data-j="run">' + ic('play', 18) + 'شغّل</button>' + (w.sol ? '<button class="btn sm sec hide" data-j="sol">👀 الحل</button>' : '') + (w.hint ? '<button class="btn sm sec" data-j="hint">' + ic('bulb', 18) + 'تلميح</button>' : '') + '</div><div class="pyout"></div></div>' + (w.page ? '<div class="browser" style="margin-top:8px"><div class="addr"><span>🌐</span><input value="page.oqab" readonly></div><iframe sandbox="allow-scripts" title="الصفحة" style="height:200px"></iframe></div>' : '');
+    const ta = $('textarea', el), out = $('.pyout', el); Py.tabKeys(ta); let fails = 0;
+    const onMsg = e => { if (!el.isConnected) { window.removeEventListener('message', onMsg); return; } if (!e.data || e.data.oqab !== 'js') return; const r = e.data; out.innerHTML = esc(r.out || '') + (r.err ? '<span class="er">⚠️ ' + esc(r.err) + '</span>' : '') || '<span class="dim">(لم يطبع شيئاً)</span>';
+      const o = (r.out || '').trim(); let ok = !r.err;
+      if (ok && w.check) { if (w.check.out != null) ok = o === w.check.out; if (ok && w.check.has) ok = w.check.has.every(t => ta.value.includes(t)); if (ok && w.check.outHas) ok = [].concat(w.check.outHas).every(t => o.includes(t)); if (ok && w.check.page) ok = new RegExp(w.check.page).test(r.html || ''); }
+      if (ok) { api.done(w.yes || 'الكود يعمل! ⚡'); if (w.medal) api.medal(w.medal); } else { fails++; api.wrong && api.wrong(); if (!r.err) api.fb(false, w.outMsg || 'يعمل، لكن ليس الناتج المطلوب بعد.'); if (fails >= 2 && w.sol) { const sb = $('[data-j="sol"]', el); if (sb) sb.classList.remove('hide'); } } };
+    window.addEventListener('message', onMsg);
+    el.onclick = e => {
+      const b = e.target.closest('[data-j]'); if (!b) return;
+      if (b.dataset.j === 'sol') { ta.value = w.sol; return; }
+      if (b.dataset.j === 'hint') { api.hint && api.hint(); api.fb(false, '💡 ' + w.hint); return; }
+      const fr = w.page ? $('iframe', el) : (() => { let f = $('iframe.hidden-js', el); if (!f) { f = document.createElement('iframe'); f.className = 'hidden-js'; f.setAttribute('sandbox', 'allow-scripts'); f.style.display = 'none'; el.appendChild(f); } return f; })();
+      const code = ta.value;
+      fr.srcdoc = '<meta charset="utf-8"><body style="font-family:Tajawal,sans-serif;direction:rtl;padding:8px">' + (w.page || '') + '<script>(function(){var out=[];var L=function(){out.push(Array.prototype.map.call(arguments,function(x){return typeof x==="object"?JSON.stringify(x):String(x)}).join(" "))};console.log=L;var err=null;try{' + code.replace(/<\/script/gi, '<\\/script') + '\n}catch(e){err=e.name+": "+e.message}setTimeout(function(){parent.postMessage({oqab:"js",out:out.join("\\n"),err:err,html:document.body.innerHTML},"*")},50)})()<\/script></body>';
+    };
+  },
+
+  /* ---- XOR machine ---- */
+  xor(w, el, api) {
+    el.innerHTML = '<div class="wbox"><div class="row"><label style="flex:1">الرسالة<input class="inp" id="xm" value="' + esc(w.text || 'سر') + '"></label><label style="width:120px">المفتاح<input class="inp mono" id="xk" dir="ltr" maxlength="1" value="' + esc(w.key || 'K') + '"></label></div><div class="hexv" id="xo" style="margin-top:8px;white-space:pre-wrap"></div><p id="xr" style="font-weight:800"></p></div>';
+    let n = 0;
+    const up = () => {
+      const t = $('#xm', el).value, k = ($('#xk', el).value || 'K').charCodeAt(0) & 255; const bytes = Array.from(new TextEncoder().encode(t)).slice(0, 6);
+      const b8 = x => x.toString(2).padStart(8, '0');
+      $('#xo', el).textContent = bytes.map(b => '  ' + b8(b) + '   (الحرف)\n⊕ ' + b8(k) + '   (المفتاح)\n= ' + b8(b ^ k) + '   (المشفّر)\n⊕ ' + b8(k) + '   (المفتاح مرة أخرى)\n= ' + b8(b) + '   ← رجع الأصل!\n').join('\n');
+      $('#xr', el).textContent = 'لاحظ: XOR بنفس المفتاح مرتين يرجع الرسالة كما كانت 🔁';
+      if (++n > 2) { api.done(w.yes || 'هذه قوة XOR: نفس المفتاح يشفّر ويفك!'); if (w.medal) api.medal(w.medal); }
+    };
+    $('#xm', el).oninput = up; $('#xk', el).oninput = up; up();
+  },
+
+  /* ---- real digital signature (ECDSA in the browser) ---- */
+  sign(w, el, api) {
+    el.innerHTML = '<div class="wbox"><p style="margin-top:0">✍️ عُقاب يملك <b>مفتاحاً خاصاً</b> يوقّع به، والجميع يملكون <b>مفتاحه العام</b> ليتحقّقوا.</p><textarea class="inp" id="sgm" rows="2">' + esc(w.text || 'اجتماع الأبطال غداً الساعة 5') + '</textarea><div class="row" style="margin-top:8px"><button class="btn sm" id="sgs">✍️ وقّع بالمفتاح الخاص</button><button class="btn sm sec" id="sgv">🔍 تحقّق بالمفتاح العام</button></div><div class="hexv" id="sgo" style="margin-top:8px;white-space:pre-wrap;word-break:break-all;min-height:40px"></div><p id="sgr" style="font-weight:800"></p></div>';
+    let keys = null, sig = null, signedText = '', verified = 0, tamper = 0;
+    const enc = t => new TextEncoder().encode(t);
+    const ensure = async () => { if (!keys) keys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign', 'verify']); };
+    $('#sgs', el).onclick = async () => { try { await ensure(); signedText = $('#sgm', el).value; sig = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, keys.privateKey, enc(signedText))); $('#sgo', el).textContent = 'التوقيع: ' + Array.from(sig.slice(0, 24)).map(b => b.toString(16).padStart(2, '0')).join('') + '...'; $('#sgr', el).textContent = 'وُقّعت الرسالة. الآن جرّب التحقّق، ثم غيّر حرفاً واحداً في الرسالة وتحقّق مرة أخرى!'; $('#sgr', el).style.color = ''; Snd.ok(); } catch (e) { $('#sgr', el).textContent = 'المتصفح لا يدعم التوقيع هنا'; api.done(); } };
+    $('#sgv', el).onclick = async () => { if (!sig) { toast('وقّع أولاً'); return; } const cur = $('#sgm', el).value; const ok = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, keys.publicKey, sig, enc(cur)); $('#sgr', el).textContent = ok ? '✅ التوقيع صحيح: الرسالة من عُقاب ولم يغيّرها أحد' : '❌ التوقيع لا يطابق! الرسالة تغيّرت بعد التوقيع (أو ليست من عُقاب)'; $('#sgr', el).style.color = ok ? 'var(--ok)' : 'var(--bad)'; ok ? (Snd.ok(), verified++) : (Snd.bad(), tamper++); if (verified && tamper) { api.done(w.yes || 'رأيت بنفسك: أي تغيير ولو حرفاً واحداً يكشفه التوقيع!'); if (w.medal) api.medal(w.medal); } };
+  },
+
+  /* ---- ransomware simulation: backups save the day ---- */
+  ransom(w, el, api) {
+    let files = ['📷 صور العائلة', '📝 واجب المدرسة', '🎮 حفظ اللعبة', '🎨 رسوماتي'], hit = false, backup = false, restored = false, round = 0;
+    const draw = () => {
+      el.innerHTML = '<div class="wbox"><div class="grid2"><div class="bucket"><h4>💻 حاسوبك</h4>' + files.map(f => '<div class="tag" style="margin:4px 0">' + (hit && !restored ? '🔒 ' + f.slice(2) + '.locked' : f) + '</div>').join('') + '</div><div class="bucket"><h4>💾 قرص النسخ الاحتياطي</h4>' + (backup ? files.map(f => '<div class="tag right" style="margin:4px 0">' + f + '</div>').join('') : '<p class="muted" style="text-align:center">(فارغ)</p>') + '</div></div>' +
+        (hit && !restored ? '<div class="feedback bad">💀 «تم تشفير ملفاتك! ادفع لنفكّها...» <div class="why">لا تدفع أبداً! لا شيء يضمن أنهم سيعيدونها.</div></div>' : '') +
+        '<div class="row" style="margin-top:8px">' + (!hit ? '<button class="btn sm sec" id="rb">💾 انسخ احتياطياً</button><button class="btn sm bad" id="rh">📎 افتح المرفق المريب</button>' : !restored ? (backup ? '<button class="btn sm ok" id="rr">♻️ امسح الجهاز واسترجع النسخة</button>' : '<button class="btn sm" id="rt">↺ جرّب مرة أخرى (مع نسخة احتياطية)</button>') : '<p class="feedback ok" style="width:100%">🎉 استرجعت كل ملفاتك دون أن تدفع شيئاً!</p>') + '</div></div>';
+      const b = $('#rb', el); if (b) b.onclick = () => { backup = true; Snd.ok(); draw(); };
+      const h = $('#rh', el); if (h) h.onclick = () => { hit = true; Snd.bad(); draw(); };
+      const r = $('#rr', el); if (r) r.onclick = () => { restored = true; Snd.win(); draw(); api.done(w.yes || 'النسخة الاحتياطية هزمت برنامج الفدية!'); if (w.medal) api.medal(w.medal); };
+      const t = $('#rt', el); if (t) t.onclick = () => { hit = false; backup = false; round++; draw(); api.fb(false, 'بلا نسخة احتياطية ضاعت الملفات. هذه المرة انسخ أولاً!'); };
+    };
+    draw();
+  },
+
+  /* ---- packet capture viewer ---- */
+  packets(w, el, api) {
+    const P = w.packets; let sel = null;
+    el.innerHTML = '<div class="wbox"><input class="inp mono" id="pf" dir="ltr" placeholder="فلتر: اكتب كلمة مثل HTTP أو 10.0.0.5" autocomplete="off" spellcheck="false"><div id="pl" dir="ltr" style="margin-top:6px;max-height:260px;overflow:auto"></div><div id="pd"></div>' + (w.ask ? '<form class="flagin" id="pfa" style="margin-top:8px"><input class="inp mono" placeholder="' + esc(w.askPh || 'إجابتك') + '" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn">تحقّق</button></form><p style="margin:4px 0"><b>' + md(w.ask) + '</b></p>' : '') + '</div>';
+    const draw = () => { const q = $('#pf', el).value.trim().toLowerCase(); const rows = P.map((p, i) => [p, i]).filter(([p]) => !q || [p.src, p.dst, p.proto, String(p.port), p.info].join(' ').toLowerCase().includes(q)); $('#pl', el).innerHTML = '<table class="t ltr mono" style="direction:ltr;font-size:11.5px;white-space:nowrap"><thead><tr><th>#</th><th>من</th><th>إلى</th><th>نوع</th><th>منفذ</th><th>معلومات</th></tr></thead><tbody>' + rows.map(([p, i]) => '<tr data-p="' + i + '" style="cursor:pointer' + (sel === i ? ';background:var(--warn-bg)' : '') + '"><td>' + (i + 1) + '</td><td>' + esc(p.src) + '</td><td>' + esc(p.dst) + '</td><td>' + esc(p.proto) + '</td><td>' + esc(p.port) + '</td><td>' + esc(p.info) + '</td></tr>').join('') + '</tbody></table><small class="muted" dir="rtl" style="display:block">' + rows.length + ' من ' + P.length + ' حزمة · اضغط على حزمة لترى محتواها</small>'; };
+    $('#pf', el).oninput = draw; draw();
+    el.addEventListener('click', e => { const r = e.target.closest('[data-p]'); if (!r) return; sel = +r.dataset.p; const p = P[sel]; draw(); $('#pd', el).innerHTML = '<p style="margin:8px 0 4px"><b>محتوى الحزمة ' + (sel + 1) + ':</b></p><div class="hexv" style="white-space:pre-wrap">' + esc(p.data || '(لا محتوى)') + '</div>'; Snd.click(); });
+    const f = $('#pfa', el); if (f) f.onsubmit = e => { e.preventDefault(); const v = norm($('input', f).value); if ([].concat(w.ans).some(a => norm(a) === v)) { api.done(w.yes || 'أحسنت يا متتبّع الحزم!'); if (w.medal) api.medal(w.medal); } else { api.wrong && api.wrong(); api.fb(false, 'ليس بعد. استخدم الفلتر وافتح الحزم.', w.hint); } };
+    if (!w.ask) api.done && api.done();
+  }
 };

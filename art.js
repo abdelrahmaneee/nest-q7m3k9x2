@@ -8,12 +8,12 @@ const Art = (() => {
   };
   const LOOKS = {
     s1: {
-      cos: [['classic', 'الكلاسيكي', null], ['astro', 'رائد الفضاء', { rank: 1 }], ['detective', 'المحقّق', { rank: 2 }], ['knight', 'الفارس', { rank: 3 }], ['wizard', 'الساحر', { rank: 4 }], ['king', 'الملك', { crown: 1 }]],
+      cos: [['classic', 'الكلاسيكي', null], ['astro', 'رائد الفضاء', { rank: 1 }], ['detective', 'المحقّق', { rank: 2 }], ['knight', 'الفارس', { rank: 3 }], ['wizard', 'الساحر', { rank: 4 }], ['king', 'الملك', { crown: 1 }], ['scientist', 'العالِم', { medal: 'lessons25' }], ['pharaoh', 'الفرعون', { medal: 'stars5' }]],
       col: ['blue', 'red', 'green', 'gold', 'purple', 'orange'],
       th: [['sky', 'السماء'], ['forest', 'الغابة'], ['sunset', 'الغروب'], ['candy', 'الحلوى'], ['desert', 'الصحراء']]
     },
     s2: {
-      cos: [['ninja', 'النينجا', null], ['hood', 'صاحب القلنسوة', null], ['cyborg', 'السايبورغ', { flags: 5 }], ['shadow', 'الظل', { flags: 12 }]],
+      cos: [['ninja', 'النينجا', null], ['hood', 'صاحب القلنسوة', null], ['cyborg', 'السايبورغ', { flags: 5 }], ['shadow', 'الظل', { flags: 12 }], ['samurai', 'الساموراي', { medal: 'tr_case' }]],
       col: ['ngreen', 'ncyan', 'npink', 'nred', 'namber'],
       th: [['neon', 'النيون'], ['synth', 'السينث'], ['ice', 'الجليد'], ['ember', 'الجمر']]
     }
@@ -32,6 +32,9 @@ const Art = (() => {
     if (cos === 'knight') top = '<path d="M30 46 q0 -30 30 -30 q30 0 30 30 h-6 q-2 -20 -24 -22 q-22 2 -24 22z" fill="#B8C2D1" stroke="#4B5563" stroke-width="2.5"/><path d="M60 16 v14" stroke="#4B5563" stroke-width="3"/><path d="M62 16 q16 -14 30 -6 q-12 2 -18 12" fill="#E04B4B" stroke="#7A1A1A" stroke-width="2"/>';
     if (cos === 'wizard') top = '<path d="M36 30 l24 -32 l24 32z" fill="#5B3DB5" stroke="#2A1B5E" stroke-width="2.5"/><ellipse cx="60" cy="30" rx="30" ry="6" fill="#4B2FA0" stroke="#2A1B5E" stroke-width="2"/><path d="M58 8 l2 4 l4 1 l-3 3 l1 4 l-4 -2 l-4 2 l1 -4 l-3 -3 l4 -1z" fill="#FFD36B"/><circle cx="68" cy="20" r="2" fill="#FFD36B"/>';
     if (cos === 'king') top = '<path d="M36 26 l6 -18 l9 12 l9 -16 l9 16 l9 -12 l6 18z" fill="#F2C230" stroke="#8A5A00" stroke-width="2.5"/><circle cx="60" cy="16" r="3" fill="#E04B4B"/><circle cx="45" cy="20" r="2.5" fill="#2F6BD8"/><circle cx="75" cy="20" r="2.5" fill="#14A37F"/>';
+    if (cos === 'scientist') top = '<g fill="none" stroke="#334155" stroke-width="3"><circle cx="48" cy="50" r="12" fill="rgba(180,230,255,.35)"/><circle cx="72" cy="50" r="12" fill="rgba(180,230,255,.35)"/><path d="M60 50 h0 M36 48 l-6 -2 M84 48 l6 -2"/></g><path d="M58 22 q2 -12 10 -14 q-2 8 4 10" fill="#14A37F" stroke="#0B4D3A" stroke-width="2"/><circle cx="66" cy="10" r="3" fill="#7CF0C0"/>';
+    if (cos === 'pharaoh') { back = '<path d="M26 44 l-10 50 l14 -4 l2 -40z M94 44 l10 50 l-14 -4 l-2 -40z" fill="#2F6BD8" stroke="#1E3A8A" stroke-width="2"/><path d="M20 70 h12 M88 70 h12 M18 82 h12 M90 82 h12" stroke="#F2C230" stroke-width="4"/>'; top = '<path d="M28 44 q2 -30 32 -30 q30 0 32 30 q-32 -10 -64 0z" fill="#F2C230" stroke="#8A5A00" stroke-width="2.5"/><path d="M36 30 q24 -8 48 0 M32 38 q28 -8 56 0" stroke="#2F6BD8" stroke-width="4" fill="none"/><path d="M60 14 q6 -6 4 -12 q-8 2 -6 10z" fill="#14A37F" stroke="#0B4D3A" stroke-width="1.5"/>'; }
+    if (cos === 'samurai') top = '<path d="M28 42 q0 -28 32 -28 q32 0 32 28 q-10 -6 -32 -6 q-22 0 -32 6z" fill="#7F1D1D" stroke="#2A0A0A" stroke-width="2.5"/><path d="M60 16 q-26 -20 -34 -6 q12 -2 22 12 M60 16 q26 -20 34 -6 q-12 -2 -22 12" fill="' + steel2 + '" stroke="#2A0A0A" stroke-width="2"/><circle cx="60" cy="24" r="4" fill="' + steel2 + '"/><path d="M26 44 l-8 14 l14 -6 M94 44 l8 14 l-14 -6" fill="#7F1D1D" stroke="#2A0A0A" stroke-width="2"/>';
     if (cos === 'ninja') band = '<path d="M30 40 h60 v16 h-60z" fill="#111827"/><path d="M90 46 q14 -2 20 8 M90 50 q12 6 14 16" stroke="#111827" stroke-width="5" fill="none" stroke-linecap="round"/>';
     if (cos === 'hood') mid = '<path d="M24 64 q-6 -50 36 -54 q42 4 36 54 q-6 -14 -12 -18 q-4 -22 -24 -24 q-20 2 -24 24 q-6 4 -12 18z" fill="#1F2937" stroke="#0B1220" stroke-width="2.5"/>';
     if (cos === 'cyborg') top = '<rect x="30" y="42" width="60" height="14" rx="7" fill="' + steel2 + '" opacity=".55"/><rect x="30" y="42" width="60" height="14" rx="7" fill="none" stroke="' + steel2 + '" stroke-width="2"/><path d="M80 22 l12 -14" stroke="' + steel2 + '" stroke-width="3"/><circle cx="93" cy="7" r="3.5" fill="' + steel2 + '"/>';

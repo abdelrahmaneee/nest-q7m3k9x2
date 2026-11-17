@@ -50,7 +50,7 @@ const CoachUI = {
     const ps = Prof.list();
     if (!CoachUI.sel || (CoachUI.sel !== '*' && !Prof.one(CoachUI.sel))) CoachUI.sel = ps[0] ? ps[0].id : null;
     const tabs = [['day', 'الأيام'], ['prog', 'التقدّم'], ['ctl', 'التحكّم'], ['msg', 'الرسائل والتحدي'], ['ply', 'اللاعبون'], ['data', 'البيانات']];
-    let h = '<div class="row" style="justify-content:space-between;margin-top:10px"><h1 style="margin:0">لوحة المدرب</h1><button class="btn sm sec" id="clk">' + ic('lock', 18) + 'قفل والخروج</button></div><p class="muted" style="margin:0;font-size:.85em">تُقفل وحدها عند الخروج منها أو بعد 3 دقائق بلا نشاط.</p>';
+    let h = '<div class="row" style="justify-content:space-between;margin-top:10px"><h1 style="margin:0">لوحة المدرب</h1><span class="row" style="gap:6px"><button class="btn sm gold" id="ctest">🧪 حساب الاختبار</button><button class="btn sm sec" id="clk">' + ic('lock', 18) + 'قفل والخروج</button></span></div><p class="muted" style="margin:0;font-size:.85em">تُقفل وحدها عند الخروج منها أو بعد 3 دقائق بلا نشاط.</p>';
     h += '<div class="ctabs">' + tabs.map(t => '<button data-ct="' + t[0] + '" aria-pressed="' + (CoachUI.tab === t[0]) + '">' + t[1] + '</button>').join('') + '</div>';
     if (['day', 'prog', 'ctl'].includes(CoachUI.tab)) {
       if (!ps.length && CoachUI.tab !== 'ctl') return { html: h + '<div class="card">لا يوجد لاعبون بعد. أضف أخويك من تبويب «اللاعبون»، أو يضيف كل واحد منهما حسابه من جهازه.</div>', mount: CoachUI.mount };
@@ -99,6 +99,7 @@ const CoachUI = {
   mount() {
     $$('[data-ct]').forEach(b => b.onclick = () => { CoachUI.tab = b.dataset.ct; App.render(); });
     $$('[data-ks]').forEach(b => b.onclick = () => { CoachUI.sel = b.dataset.ks; CoachUI.day = null; App.render(); });
+    $('#ctest').onclick = () => { CoachUI.open = false; Kid.use('kt'); if (!Kid.get().name) Kid.setName('المختبِر'); App.go(Kid.get().pledge ? 'map' : 'newplayer'); };
     $('#clk').onclick = () => { CoachUI.open = false; App.go(Kid.pid() ? 'map' : 'who'); App.render(); };
     const m = CoachUI['m_' + CoachUI.tab]; if (m) m();
   },
@@ -150,13 +151,13 @@ const CoachUI = {
     const k = Kid.of(CoachUI.sel); D = App.derive(CoachUI.sel);
     let h = '<table class="t"><thead><tr><th>الوحدة</th><th>الدروس</th><th>الاختبار</th><th>صعوبة</th></tr></thead><tbody>';
     const weak = {};
-    C.units.concat(C.final ? [C.final] : []).forEach(u => {
+    C.units.forEach(u => {
       const s = D.st[u.id]; let tr = 0, hn = 0, secs = 0;
       u.lessons.forEach(l => { const L = k.L[u.id + '.' + l.id]; if (L) { tr += L.t || 0; hn += L.h || 0; secs += L.s || 0; (L.w || []).forEach(t => weak[t] = (weak[t] || 0) + 1); } });
       const T = k.T[u.id]; const atts = T ? Object.values(T.a || {}) : []; atts.forEach(a => (a.w || []).forEach(t => weak[t] = (weak[t] || 0) + 1));
       const fails = atts.filter(a => a.sc < 80).length;
       const hard = tr + hn * 2 + fails * 4; const lvl = hard > 25 ? 'bad' : hard > 10 ? 'warn' : 'ok';
-      h += '<tr><td><b>' + u.icon + ' ' + esc(u.title) + '</b>' + (s && !s.open ? ' <span class="pill">🔒</span>' : '') + '<br><small class="muted">' + fmtMin(secs) + '</small></td><td>' + (s ? s.ld + '/' + s.total : '-') + '</td><td>' + (u.id === 'final' ? (k.X.final ? '✅' : '-') : T ? '<span class="pill ' + (T.p ? 'ok' : 'bad') + '">' + (T.b || 0) + '%</span><br><small>' + cnt(atts.length, F_TRY) + '</small>' : '-') + '</td><td>' + (tr || hn || fails ? '<span class="pill ' + lvl + '">' + tr + ' خطأ · ' + hn + ' تلميح' + (fails ? ' · ' + fails + ' رسوب' : '') + '</span>' : '-') + '</td></tr>';
+      h += '<tr><td><b>' + u.icon + ' ' + esc(u.title) + '</b>' + (s && !s.open ? ' <span class="pill">🔒</span>' : '') + '<br><small class="muted">' + fmtMin(secs) + '</small></td><td>' + (s ? s.ld + '/' + s.total : '-') + '</td><td>' + (u.project ? (D.st[u.id].passed ? '✅' : '-') : T ? '<span class="pill ' + (T.p ? 'ok' : 'bad') + '">' + (T.b || 0) + '%</span><br><small>' + cnt(atts.length, F_TRY) + '</small>' : '-') + '</td><td>' + (tr || hn || fails ? '<span class="pill ' + lvl + '">' + tr + ' خطأ · ' + hn + ' تلميح' + (fails ? ' · ' + fails + ' رسوب' : '') + '</span>' : '-') + '</td></tr>';
     });
     h += '</tbody></table>';
     const wk = Object.entries(weak).sort((a, b) => b[1] - a[1]).slice(0, 10);
@@ -174,7 +175,6 @@ const CoachUI = {
     const opt = (id, v) => '<select class="inp" data-u="' + id + '" style="width:auto;padding:4px 8px">' + [['', one ? 'حسب «الجميع» / تلقائي' : 'تلقائي'], ['open', 'مفتوحة'], ['lock', 'مقفلة']].map(o => '<option value="' + o[0] + '"' + ((v || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
     let h = '<p class="muted">«تلقائي» = تُفتح عندما ينجح في اختبار الوحدة السابقة بـ 80%. إعداد اللاعب الواحد يغلب إعداد «الجميع» إذا كان أحدث.</p><table class="t"><tbody>';
     C.units.forEach(u => { h += '<tr><td>' + u.icon + ' ' + esc(u.title) + '</td><td>' + (one ? (D.st[u.id].open ? '🔓' : '🔒') : '') + '</td><td>' + opt(u.id, cur(u.id)) + '</td></tr>'; });
-    if (C.final) h += '<tr><td>⭐ ' + esc(C.final.title) + '</td><td>' + (one ? (D.st.final.open ? '🔓' : '🔒') : '') + '</td><td>' + opt('final', cur('final')) + '</td></tr>';
     const s2 = c.ctfU[sc] ? c.ctfU[sc].m : '';
     h += '<tr><td>🚩 المرحلة الثانية (الأعلام)</td><td>' + (one ? (D.stage2 ? '🔓' : '🔒') : '') + '</td><td><select class="inp" id="cs2" style="width:auto;padding:4px 8px">' + [['', one ? 'حسب «الجميع» / تلقائي' : 'تلقائي'], ['open', 'مفتوحة'], ['lock', 'مقفلة']].map(o => '<option value="' + o[0] + '"' + (s2 === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></td></tr></tbody></table>';
     h += '<div class="card"><h3 style="margin-top:0">معاينة</h3><p class="muted">تصفّح التطبيق كما يراه ' + (one ? esc(Prof.one(sc).name) : 'لاعب جديد يبدأ من الصفر') + '، دون أن يُسجَّل أي شيء. وشاهد الهدايا والاحتفالات كما تظهر لأخويك.</p>' + (one ? '<button class="btn sec" id="cprev">' + ic('eye', 20) + 'معاينة كـ' + esc(Prof.one(sc).name) + '</button> ' : '<button class="btn sec" id="cdemo">' + ic('eye', 20) + 'عرض تجريبي (لاعب جديد)</button> ') + '<button class="btn sec" id="cpg">🎁 هدية الرتبة</button> <button class="btn sec" id="cpc">👑 تاج بطل الأسبوع</button> <button class="btn sec" id="cps2">🌙 دخول المرحلة الثانية</button></div>';
