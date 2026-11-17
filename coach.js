@@ -49,7 +49,9 @@ const CoachUI = {
     if (!CoachUI.open) return CoachUI.pinScreen(!c.pin);
     const ps = Prof.list();
     if (!CoachUI.sel || (CoachUI.sel !== '*' && !Prof.one(CoachUI.sel))) CoachUI.sel = ps[0] ? ps[0].id : null;
-    const tabs = [['day', 'الأيام'], ['prog', 'التقدّم'], ['ctl', 'التحكّم'], ['msg', 'الرسائل والتحدي'], ['ply', 'اللاعبون'], ['data', 'البيانات']];
+    if (CoachUI.firstView !== false) { CoachUI.firstView = false; if (Help.pending().length) CoachUI.tab = 'help'; }
+    const hn = Help.pending().length;
+    const tabs = [['help', '🙋 المساعدة' + (hn ? ' <b class="hdot inl">' + hn + '</b>' : '')], ['day', 'الأيام'], ['prog', 'التقدّم'], ['ctl', 'التحكّم'], ['msg', 'الرسائل والتحدي'], ['ply', 'اللاعبون'], ['data', 'البيانات']];
     let h = '<div class="row" style="justify-content:space-between;margin-top:10px"><h1 style="margin:0">لوحة المدرب</h1><span class="row" style="gap:6px"><button class="btn sm gold" id="ctest">🧪 حساب الاختبار</button><button class="btn sm sec" id="clk">' + ic('lock', 18) + 'قفل والخروج</button></span></div><p class="muted" style="margin:0;font-size:.85em">تُقفل وحدها عند الخروج منها أو بعد 3 دقائق بلا نشاط.</p>';
     h += '<div class="ctabs">' + tabs.map(t => '<button data-ct="' + t[0] + '" aria-pressed="' + (CoachUI.tab === t[0]) + '">' + t[1] + '</button>').join('') + '</div>';
     if (['day', 'prog', 'ctl'].includes(CoachUI.tab)) {
@@ -96,7 +98,9 @@ const CoachUI = {
       }
     };
   },
+  t_help() { return Help.coachTab(); },
   mount() {
+    if (CoachUI.tab === 'help') Help.mountCoach();
     $$('[data-ct]').forEach(b => b.onclick = () => { CoachUI.tab = b.dataset.ct; App.render(); });
     $$('[data-ks]').forEach(b => b.onclick = () => { CoachUI.sel = b.dataset.ks; CoachUI.day = null; App.render(); });
     $('#ctest').onclick = () => { CoachUI.open = false; Kid.use('kt'); if (!Kid.get().name) Kid.setName('المختبِر'); App.go(Kid.get().pledge ? 'map' : 'newplayer'); };

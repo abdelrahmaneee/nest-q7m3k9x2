@@ -435,6 +435,45 @@ const Widgets = {
     };
   },
 
+  /* ---- mini web studio: HTML / CSS / JS tabs + live page + missions checked inside the page ---- */
+  web(w, el, api) {
+    const tabs = w.tabs || ['html', 'css', 'js'], code = { html: w.html || '', css: w.css || '', js: w.js || '' };
+    const name = { html: '🦴 HTML', css: '🎨 CSS', js: '⚡ JS' };
+    let cur = w.tab || tabs[0], fails = 0, nonce = rid(6), done = {}, finished = false;
+    el.innerHTML = (w.missions ? '<ul class="goals">' + w.missions.map((m, i) => '<li id="wm' + i + '"><i></i><span>' + md(m.d) + '</span></li>').join('') + '</ul>' : '') +
+      '<div class="pybox"><div class="row" style="gap:4px;padding:6px 8px;border-bottom:2px solid var(--line);direction:ltr">' + tabs.map(t => '<button class="tag' + (t === cur ? ' sel' : '') + '" data-wt="' + t + '">' + name[t] + '</button>').join('') + '</div>' +
+      tabs.map(t => '<textarea data-wc="' + t + '" spellcheck="false" autocapitalize="off" dir="ltr"' + (t === cur ? '' : ' hidden') + '>' + esc(code[t]) + '</textarea>').join('') +
+      '<div class="bar2"><button class="btn sm ok" id="wrun">' + ic('play', 18) + 'شغّل الصفحة</button>' + (w.hint ? '<button class="btn sm sec" id="whint">' + ic('bulb', 18) + 'تلميح</button>' : '') + (w.sol ? '<button class="btn sm sec hide" id="wsol">👀 الحل</button>' : '') + '</div></div>' +
+      '<div class="browser" style="margin-top:8px"><div class="addr"><span>🔒</span><input value="' + esc(w.addr || 'my-site.oqab') + '" readonly></div><iframe sandbox="allow-scripts" title="صفحتك" style="height:' + (w.h || 260) + 'px"></iframe></div><div class="pyout" id="wout" style="display:none;margin-top:6px"></div>';
+    $$('textarea', el).forEach(ta => { Py.tabKeys(ta); ta.oninput = () => { code[ta.dataset.wc] = ta.value; }; });
+    const fr = $('iframe', el);
+    const probe = ms => '<script>(function(){var R=[],L=[],E=null;var ol=console.log;console.log=function(){L.push(Array.prototype.map.call(arguments,String).join(" "))};window.addEventListener("error",function(e){E=e.message});' +
+      'window.__oqabCheck=function(){var M=' + JSON.stringify(ms.map(m => ({ a: m.act || '', c: m.dom || '' }))) + ';M.forEach(function(m){var ok=null;try{if(m.a)(new Function(m.a))();if(m.c)ok=!!(new Function("return ("+m.c+")"))()}catch(x){ok=false}R.push(ok)});parent.postMessage({oqabweb:"' + nonce + '",r:R,log:L,err:E},"*")};})()<\/script>';
+    const render = check => {
+      const ms = check ? (w.missions || []) : [];
+      fr.srcdoc = '<!doctype html><meta charset="utf-8"><style>body{font-family:Tajawal,system-ui,sans-serif;padding:10px;margin:0}</style>' + probe(ms) + '<style>' + code.css + '</style>' + code.html + '<script>try{(new Function(' + JSON.stringify(code.js).replace(/<\//g, '<\\/') + '))()}catch(e){console.log("⚠️ "+e.name+": "+e.message+(e.name==="SyntaxError"?" (هل نسيت أن تكمل مكان النقاط ... أو أن تغلق قوساً؟)":""))}<\/script><script>setTimeout(function(){window.__oqabCheck()},' + (check ? 120 : 1e9) + ')<\/script>';
+    };
+    const onMsg = e => {
+      if (!el.isConnected) { window.removeEventListener('message', onMsg); return; }
+      if (!e.data || e.data.oqabweb !== nonce) return;
+      const out = $('#wout', el); const lg = (e.data.log || []).join('\n'); out.style.display = lg || e.data.err ? '' : 'none'; out.innerHTML = esc(lg) + (e.data.err ? '<span class="er">⚠️ ' + esc(e.data.err) + '</span>' : '');
+      const src = code.html + '\n' + code.css + '\n' + code.js;
+      (w.missions || []).forEach((m, i) => { if (done[i]) return; let ok = e.data.r[i]; if (ok === null) ok = true; if (ok && m.src) ok = new RegExp(m.src, 'i').test(src); if (ok && m.nosrc) ok = !new RegExp(m.nosrc, 'i').test(src); if (ok) { done[i] = 1; const li = $('#wm' + i, el); li.classList.add('done'); $('i', li).textContent = '✓'; } });
+      const all = !w.missions || Object.keys(done).length === w.missions.length;
+      if (all && !finished) { finished = true; api.done(w.yes || 'صفحتك تعمل! 🎉'); if (w.medal) api.medal(w.medal); }
+      else if (!all) { fails++; api.wrong && api.wrong(); api.fb(false, w.outMsg || 'بعض المهام لم تكتمل بعد. انظر للمهام التي بلا ✓.'); if (fails >= 2 && w.sol) { const b = $('#wsol', el); if (b) b.classList.remove('hide'); } }
+    };
+    window.addEventListener('message', onMsg);
+    el.onclick = e => {
+      const t = e.target.closest('[data-wt]'); if (t) { cur = t.dataset.wt; $$('[data-wt]', el).forEach(b => b.classList.toggle('sel', b === t)); $$('[data-wc]', el).forEach(x => x.hidden = x.dataset.wc !== cur); return; }
+      if (e.target.closest('#wrun')) { nonce = rid(6); render(true); Snd.click(); return; }
+      if (e.target.closest('#whint')) { api.hint && api.hint(); api.fb(false, '💡 ' + w.hint); return; }
+      if (e.target.closest('#wsol')) { Object.assign(code, w.sol); $$('[data-wc]', el).forEach(x => x.value = code[x.dataset.wc]); return; }
+    };
+    render(false);
+    if (!w.missions && !w.goal) api.done && api.done();
+  },
+
   /* ---- file permissions editor (rwx) ---- */
   perm(w, el, api) {
     let p = (w.start || 'rw-r--r--').split('');

@@ -336,3 +336,18 @@ table.t th{color:var(--muted);font-size:.85em}
 .stars i{font-style:normal;color:var(--line)}
 .stars.big{font-size:2em;text-align:center;line-height:1.2}
 .unit.proj{border-color:var(--gold);background:linear-gradient(135deg,var(--card) 70%,color-mix(in srgb,var(--gold) 18%,var(--card)))}
+
+/* help button + requests */
+#helpbtn{position:fixed;left:12px;bottom:calc(172px + env(safe-area-inset-bottom));z-index:40;display:flex;align-items:center;gap:6px;border:2px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:8px 14px 8px 12px;font:800 .9em var(--f-head,inherit);box-shadow:0 6px 18px rgba(0,0,0,.18);cursor:pointer}
+#helpbtn:hover{transform:translateY(-1px)}
+#helpbtn.hb-wait{background:var(--warn-bg);border-color:var(--gold)}
+#helpbtn.hb-reply{background:var(--ok);border-color:var(--ok);color:#fff;animation:hbp 1.2s infinite}
+@keyframes hbp{50%{transform:scale(1.07)}}
+@media (max-width:520px){#helpbtn span{display:none}#helpbtn{font-size:1.35em;padding:8px 11px}}
+.hdot{position:absolute;top:2px;left:calc(50% + 6px);min-width:18px;height:18px;border-radius:99px;background:var(--bad);color:#fff;font-size:11px;line-height:18px;text-align:center;padding:0 4px}
+.hdot.inl{position:static;display:inline-block;margin-inline-start:4px}
+.hdot[hidden]{display:none}
+.hq{border-inline-start:5px solid var(--gold)}
+.hq.done{opacity:.7;border-inline-start-color:var(--line)}
+.modal .hq{border:2px solid var(--line);border-inline-start:5px solid var(--gold);border-radius:12px;padding:8px 10px;margin:6px 0}
+.modal .hq.done{border-inline-start-color:var(--ok)}

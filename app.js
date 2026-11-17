@@ -30,6 +30,11 @@ const MEDALS = {
   urlcheck: { n: 'قارئ الروابط', ic: '🔗', d: 'web', how: 'اكشف الروابط المزيّفة' },
   bruteforce: { n: 'كاسر قيصر', ic: '🔨', d: 'cry', how: 'اكسر شيفرة بتجربة كل المفاتيح' },
   meta: { n: 'كاشف الأسرار المخفية', ic: '🗺️', d: 'for', how: 'اكتشف البيانات الوصفية في صورة' },
+  webdesigner: { n: 'المصمّم الصغير', ic: '🎨', d: 'web', how: 'صمّم صفحتك الشخصية' },
+  webdev: { n: 'مطوّر الواجهات', ic: '🕹️', d: 'web', how: 'اصنع صفحة اختبار تفاعلية' },
+  backend: { n: 'مهندس الخوادم', ic: '🖥️', d: 'py', how: 'احمِ بيانات المستخدمين على الخادم' },
+  gitguard: { n: 'حارس المستودع', ic: '🗃️', d: 'web', how: 'امنع تسرّب الأسرار في Git' },
+  webmaster: { n: 'صانع المواقع الآمنة', ic: '🏰', d: 'web', how: 'أنهِ المشروع الكبير الثالث' },
   flags: { n: 'صائد الأعلام', ic: '🚩', d: 'ctf', how: 'التقط 8 أعلام' },
   flagmaster: { n: 'سيد الأعلام', ic: '🏆', d: 'ctf', how: 'التقط كل الأعلام' },
   nohint: { n: 'بلا تلميحات', ic: '🧠', d: 'ctf', how: 'التقط 5 أعلام دون تلميح' },
@@ -81,7 +86,7 @@ const TITLES = [
   ['t0', 'مستكشف صغير', null], ['t1', 'سيد الطرفية', { medal: 'term' }], ['t2', 'المبرمج الصغير', { medal: 'funcs' }], ['t3', 'كاسر الشيفرات', { medal: 'caesar' }],
   ['t4', 'حارس الشبكة', { medal: 'ports' }], ['t5', 'المحقّق الرقمي', { medal: 'detective' }], ['t6', 'سيد لينكس', { medal: 'root' }], ['t7', 'خبير البيانات', { medal: 'sql' }],
   ['t8', 'صائد الديدان', { medal: 'antivirus' }], ['t9', 'جامع النجوم', { medal: 'stars5' }], ['t10', 'صائد الأعلام', { medal: 'flags' }], ['t11', 'الملك المتوّج', { medal: 'crowns3' }],
-  ['t12', 'الموسوعة', { medal: 'lessons100' }], ['t13', 'أسطورة عُقاب', { medal: 'flagmaster' }]
+  ['t12', 'الموسوعة', { medal: 'lessons100' }], ['t13', 'أسطورة عُقاب', { medal: 'flagmaster' }], ['t14', 'صانع المواقع', { medal: 'webmaster' }]
 ];
 
 const App = {
@@ -121,8 +126,8 @@ const App = {
     if (Math.random() < .2) Sync.schedule();
   },
   refresh() { if (['lesson', 'test', 'ctfc', 'review', 'typing', 'newplayer'].includes(App.route[0])) { App.paintTop(); return; } App.render(); },
-  onKid() { App.paintTop(); clearTimeout(App.amT); App.amT = setTimeout(App.autoMedals, 300); App.checkCele(); },
-  onCoach() { App.applyStage(); App.checkMsgs(); },
+  onKid() { Help.watch(); if (App.route[0] === 'coach' && CoachUI.open && CoachUI.tab === 'help' && !$('.modal') && !(document.activeElement && document.activeElement.matches('input,textarea'))) App.render(); App.paintTop(); clearTimeout(App.amT); App.amT = setTimeout(App.autoMedals, 300); App.checkCele(); },
+  onCoach() { App.applyStage(); App.checkMsgs(); Help.watch(); },
 
   /* ---------- derived ---------- */
   /* every XP source with its time, so we can total it for any period */
@@ -189,7 +194,7 @@ const App = {
       const best = (k.T[u.id] && k.T[u.id].b) || 0;
       st[u.id] = { open, ld, total: u.lessons.length, passed: passedOf(u), best, stars: u.project ? 0 : best >= 100 ? 3 : best >= 90 ? 2 : best >= 80 ? 1 : 0, ov, project: !!u.project };
     });
-    let stage2 = passedOf(units[units.length - 1]) || testAll;
+    let stage2 = passedOf(units.find(u => u.id === 'final2') || units[units.length - 1]) || testAll;
     const cu = Coach.stage2(pid); if (cu === 'open') stage2 = true; if (cu === 'lock') stage2 = false;
     const solved = Object.keys(k.C).filter(id => k.C[id].d && C.ctf.some(x => x.id === id));
     const crowns = lg ? (lg.crowns[pid] || 0) : 0, king = lg ? lg.king === pid : false;
@@ -255,7 +260,7 @@ const App = {
       else if (!Kid.get().pledge) r = ['newplayer'];
     }
     if (!r.length) r = ['map'];
-    if (r[0] !== 'coach') CoachUI.open = false;
+    if (r[0] !== 'coach') { CoachUI.open = false; CoachUI.firstView = true; }
     if (r[0] === 'who' && Kid.pid() && Kid.get().pledge && !App.preview) { Kid.use(null); }
     App.route = r;
     const D = App.applyStage();
@@ -270,7 +275,8 @@ const App = {
     window.scrollTo(0, 0);
     if (out.mount) out.mount();
     App.paintSync();
-    setTimeout(() => { App.checkCele(); App.checkMsgs(); }, 400);
+    Help.paint();
+    setTimeout(() => { App.checkCele(); App.checkMsgs(); Help.checkReplies(); }, 400);
   },
   topHtml(D) {
     const night = document.documentElement.dataset.stage === '2';
@@ -298,7 +304,8 @@ const App = {
     items.push(['me', 'hat', 'ملفي'], ['coach', 'lock', 'المدرب']);
     const map = { unit: 'map', ctfc: 'ctf', next: 'ctf', weekly: 'today', glossary: 'me', look: 'me' };
     const c = map[cur] || cur;
-    t.innerHTML = '<div class="in">' + items.map(i => '<a href="#/' + i[0] + '"' + (c === i[0] ? ' aria-current="page"' : '') + '>' + ic(i[1]) + i[2] + '</a>').join('') + '</div>';
+    const hn = Dev.get().role === 'coach' ? Help.pending().length : 0;
+    t.innerHTML = '<div class="in">' + items.map(i => '<a href="#/' + i[0] + '"' + (c === i[0] ? ' aria-current="page"' : '') + ' style="position:relative">' + ic(i[1]) + i[2] + (i[0] === 'coach' ? '<b class="hdot"' + (hn ? '' : ' hidden') + '>' + hn + '</b>' : '') + '</a>').join('') + '</div>';
   },
 
   onClick(e) {
@@ -321,7 +328,7 @@ const App = {
     }
   },
   startPreview(pid) { App.preview = true; App.prevPid = Kid.pid(); Kid.use(pid, false); App.go('map'); },
-  endPreview() { App.preview = false; Kid.use(SS.get('oqab_pid'), false); App.go('coach'); },
+  endPreview() { App.helpJump = null; App.preview = false; Kid.use(SS.get('oqab_pid'), false); App.go('coach'); },
   termTip(el, click) {
     const t = C.terms[el.dataset.term]; if (!t) return;
     if (!click) { el.title = t.ar + (t.en ? ' (' + t.en + ')' : '') + ': ' + t.d; return; }
@@ -418,7 +425,7 @@ const Views = {
     if (!fam) h += '<div class="card"><h3 style="margin-top:0">🔗 رمز الربط من أخيك الكبير</h3><p class="muted" style="margin:0 0 8px">اكتبه مرة واحدة على هذا الجهاز ليظهر حسابك وتقدّمك، ويتابعك أخوك.</p><div class="row" style="flex-wrap:nowrap"><input class="inp mono" id="wfam" dir="ltr" placeholder="XXXX-XXXX-XXXX"><button class="btn" id="wfb">ربط</button></div><p id="wfm" class="muted" style="font-size:.85em;margin:4px 0 0"></p></div>';
     h += '<div class="players">' + ps.map(p => { const k = Kid.of(p.id); const D = App.derive(p.id); return '<div class="player" data-p="' + p.id + '" role="button" tabindex="0">' + Art.eagle('happy', D.rank, false, App.lookOf(k, false)) + '<b>' + esc(p.name) + (lg && lg.king === p.id ? ' 👑' : '') + '</b><small class="muted">' + esc(App.titleOf(k)) + ' · ' + esc(RANKS[D.rank].n) + '</small></div>'; }).join('') +
       (Prof.freeId() && ps.length < 4 ? '<div class="player add" data-new="1" role="button" tabindex="0"><span style="font-size:40px">＋</span>لاعب جديد</div>' : '') + '</div>';
-    h += '<div class="sync" id="sync" style="justify-content:center"></div><div style="text-align:center;margin-top:22px"><a class="btn sec" href="#/coach">' + ic('lock', 20) + 'لوحة المدرب</a></div>';
+    h += '<div class="sync" id="sync" style="justify-content:center"></div><div style="text-align:center;margin-top:22px"><a class="btn sec" href="#/coach" style="position:relative">' + ic('lock', 20) + 'لوحة المدرب' + (Dev.get().role === 'coach' && Help.pending().length ? '<b class="hdot">' + Help.pending().length + '</b>' : '') + '</a></div>';
     return {
       html: h, mount() {
         $$('[data-p]').forEach(el => el.onclick = () => Views.login(el.dataset.p));
@@ -558,7 +565,7 @@ const Views = {
     const curU = C.units.find(u => D.st[u.id].open && !D.st[u.id].passed);
     const greet = k.name ? 'يا ' + esc(k.name) : 'يا بطل';
     let h = '<div class="hero">' + Art.eagle('happy', ri.i, night) + '<div class="bubble">' + (curU ? 'أهلاً ' + greet + '! نكمل اليوم في <b>' + esc(curU.title) + '</b>.' : D.stage2 ? 'أهلاً ' + greet + '! الأعلام تنتظرك في تبويب «الأعلام».' : 'أهلاً ' + greet + '!') + '<div class="bar" style="margin-top:8px"><i style="width:' + ri.pct + '%"></i></div><small class="muted">' + esc(ri.cur.n) + (ri.next ? ' ← ' + esc(ri.next.n) + ' (باقي <bdi>' + (ri.next.x - D.xp) + ' XP</bdi>)' : '') + '</small></div></div>';
-    const PARTS = { 1: 'المرحلة الأولى · الجزء ١: الأساسيات', 2: 'المرحلة الأولى · الجزء ٢: التعمّق' };
+    const PARTS = { 1: 'المرحلة الأولى · الجزء ١: الأساسيات', 2: 'المرحلة الأولى · الجزء ٢: التعمّق', 3: 'الجزء ٣: ابنِ موقعك وأمّنه 🏗️' };
     let part = 0, n = 0;
     C.units.forEach((u, i) => {
       if ((u.part || 1) !== part) { if (part) h += '</div>'; part = u.part || 1; h += '<div class="stage-h">' + PARTS[part] + '</div><div class="path">'; }
@@ -684,7 +691,7 @@ const Lesson = {
     const key = u.id + '.' + l.id;
     Kid.lessonStart(key);
     App.lessonKey = key; App.celeOK = false;
-    const L = { u, l, key, i: 0, ok: false, steps: l.steps, xpBefore: D.xp, rank: D.rank };
+    const L = { u, l, key, i: App.preview && App.helpJump != null ? Math.min(App.helpJump, l.steps.length - 1) : 0, ok: false, steps: l.steps, xpBefore: D.xp, rank: D.rank };
     Lesson.cur = L;
     return { html: '<div id="lesson"></div>', mount() { Lesson.paint(); } };
   },

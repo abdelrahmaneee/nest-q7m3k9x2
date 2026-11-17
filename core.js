@@ -62,8 +62,8 @@ const K_KID = 'oqab_kid', K_COACH = 'oqab_coach', K_DEV = 'oqab_dev', K_BAK = 'o
 const SCHEMA = 2;
 const PIDS = ['k1', 'k2', 'k3', 'k4'];
 
-function emptyKid() { return { v: SCHEMA, g: 0, name: '', nameU: 0, pledge: 0, L: {}, T: {}, C: {}, M: {}, G: {}, R: {}, D: {}, E: {}, W: {}, MR: {}, X: {}, look: null }; }
-function emptyCoach() { return { v: SCHEMA, pin: null, U: {}, msgs: {}, wk: null, wkh: {}, ctfU: {}, goal: null }; }
+function emptyKid() { return { v: SCHEMA, g: 0, name: '', nameU: 0, pledge: 0, L: {}, T: {}, C: {}, M: {}, G: {}, R: {}, D: {}, E: {}, W: {}, MR: {}, X: {}, HQ: {}, look: null }; }
+function emptyCoach() { return { v: SCHEMA, pin: null, U: {}, msgs: {}, wk: null, wkh: {}, ctfU: {}, goal: null, HA: {} }; }
 function emptyProf() { return { v: SCHEMA, list: {} }; }
 
 /* migrations: never drop unknown fields */
@@ -113,6 +113,8 @@ function mergeKid(a, b) {
   o.D = mergeMap(a.D, b.D, (x, y) => mergeMap(x, y, (p, q) => ({ s: maxN(p.s, q.s), k: mergeMap(p.k, q.k, minD), rx: maxN(p.rx, q.rx), ty: maxN(p.ty, q.ty) })));
   o.W = mergeMap(a.W, b.W, (x, y) => ({ d: minD(x.d, y.d), ans: ((x.ans || '').length !== (y.ans || '').length ? ((x.ans || '').length > (y.ans || '').length ? x.ans : y.ans) : ((x.ans || '') >= (y.ans || '') ? x.ans : y.ans)) }));
   o.look = lww(a.look, b.look);
+  /* help requests: newest edit wins per request; keep the 40 newest */
+  o.HQ = mergeMap(a.HQ, b.HQ, lww); { const ids = Object.keys(o.HQ); if (ids.length > 40) { ids.sort((p, q) => (o.HQ[q].t || 0) - (o.HQ[p].t || 0) || (p < q ? -1 : 1)); for (const id of ids.slice(40)) delete o.HQ[id]; } }
   const E = Object.assign({}, b.E || {}, a.E || {});
   const ids = Object.keys(E);
   if (ids.length > 700) { ids.sort((p, q) => E[q].t - E[p].t || (p < q ? -1 : 1)); for (const id of ids.slice(700)) delete E[id]; }
@@ -129,6 +131,7 @@ function mergeCoach(a, b) {
   o.wkh = Object.assign({}, b.wkh || {}, a.wkh || {});
   o.ctfU = mergeMap(a.ctfU, b.ctfU, lww);
   o.goal = lww(a.goal, b.goal);
+  o.HA = mergeMap(a.HA, b.HA, lww); { const ids = Object.keys(o.HA); if (ids.length > 120) { ids.sort((p, q) => (o.HA[q].u || 0) - (o.HA[p].u || 0) || (p < q ? -1 : 1)); for (const id of ids.slice(120)) delete o.HA[id]; } }
   return o;
 }
 function mergeProf(a, b) { a = migrateProf(a); b = migrateProf(b); const o = Object.assign({}, b, a); o.list = mergeMap(a.list, b.list, lww); return o; }
@@ -211,6 +214,8 @@ const Kid = (() => {
       if (ok) today().rx = (today().rx || 0) + 1;
     },
     addCard(qid, ok) { if (!live()) return; if (!s.R[qid]) s.R[qid] = { b: ok ? 1 : 0, due: addDays(dayKey(), 1), u: now() }; },
+    askHelp(o) { if (!live()) return null; const id = rid(8); s.HQ[id] = Object.assign({}, o, { t: now(), u: now() }); save(); return id; },
+    helpEdit(id, patch) { if (!live() || !s.HQ[id]) return; s.HQ[id] = Object.assign({}, s.HQ[id], patch, { u: now() }); save(); },
     flag(k) { if (!live()) return false; if (s.X[k]) return false; s.X[k] = now(); save(); return true; },
     typing(wpm) { if (!live()) return; const t = today(); t.ty = Math.max(t.ty || 0, wpm); ev('typing', { wpm }); save(); },
     weekly(id, ans) { if (!live()) return; s.W[id] = { d: (s.W[id] && s.W[id].d) || now(), ans: ans || '' }; ev('weekly', { id }); save(); },
@@ -230,6 +235,7 @@ const Coach = (() => {
     save() { LS.set(K_COACH, c); listeners.forEach(f => f()); Sync.schedule(); },
     /* unit override for a player: player-specific beats "all" when newer */
     unit(pid, uid) { const a = c.U['*'] && c.U['*'][uid], b = pid && c.U[pid] && c.U[pid][uid]; const w = lww(a, b); return w && w.m || ''; },
+    helpSet(key, patch) { c.HA[key] = Object.assign({}, c.HA[key] || {}, patch, { u: now() }); Coach.save(); },
     stage2(pid) { const w = lww(c.ctfU['*'], pid && c.ctfU[pid]); return w && w.m || ''; }
   };
 })();

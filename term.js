@@ -168,7 +168,7 @@ const Term = {
     el.innerHTML = '<ul class="goals">' + s.goals.map((g, i) => '<li data-g="' + i + '"><i></i><span>' + md(g.d) + '</span></li>').join('') + '</ul><div class="tbox"></div>';
     const done = {};
     const T = Term.create($('.tbox', el), {
-      fs: s.fs, cwd: s.cwd, host: s.host, user: s.user, sudoers: s.sudoers, groups: s.groups, procs: s.procs, net: s.net, pw: s.pw, motd: s.motd || 'اكتب help لترى الأوامر · اضغط Tab لإكمال الأسماء تلقائياً', ext: s.ext,
+      fs: s.fs, cwd: s.cwd, host: s.host, user: s.user, sudoers: s.sudoers, groups: s.groups, procs: s.procs, net: s.net, pw: s.pw, motd: s.motd || 'اكتب help لترى الأوامر · اضغط Tab لإكمال الأسماء تلقائياً', ext: typeof s.ext === 'function' ? s.ext() : s.ext,
       onCmd(ctx) {
         s.goals.forEach((g, i) => {
           if (done[i]) return;
@@ -180,4 +180,51 @@ const Term = {
     });
     setTimeout(() => T.input.focus({ preventScroll: true }), 80);
   }
+};
+
+/* ---- a tiny pretend git for lessons (works only on the pretend file system) ---- */
+Term.git = function (spec = {}) {
+  const G = { init: !!spec.init, commits: (spec.commits || []).map(c => Object.assign({}, c)), staged: {}, snap: Object.assign({}, spec.snap || {}), remote: spec.remote || '' };
+  const hex = () => Array.from(crypto.getRandomValues(new Uint8Array(4))).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 7);
+  const files = T => { const d = T.node(T.cwd); const o = {}; if (!d || d.t !== 'd') return o; for (const k in d.c) if (d.c[k].t === 'f' && k !== '.gitignore') o[k] = d.c[k].x; return o; };
+  const ignored = T => { const g = T.node(T.resolve('.gitignore')); return g && g.t === 'f' ? g.x.split('\n').map(x => x.trim()).filter(Boolean) : []; };
+  const changed = T => { const f = files(T), ig = ignored(T); return Object.keys(f).filter(k => !ig.includes(k) && f[k] !== G.snap[k] && !(k in G.staged && G.staged[k] === f[k])); };
+  return {
+    help: [['git init', 'ابدأ مستودعاً (صندوق حفظ النسخ)'], ['git status', 'ما الذي تغيّر؟'], ['git add ملف  أو  git add .', 'جهّز الملف للحفظ'], ['git commit -m "رسالة"', 'احفظ نسخة باسم'], ['git log', 'سجل النسخ المحفوظة'], ['git show رقم', 'ماذا تغيّر في نسخة معيّنة؟'], ['git push', 'ارفع النسخ إلى GitHub']],
+    cmds: {
+      git(a, raw, T) {
+        const sub = a[0];
+        if (!sub) return T.err('git: اكتب أمراً بعد git، مثل: git status');
+        if (sub !== 'init' && !G.init) return T.err('git: هذا المجلد ليس مستودعاً بعد. ابدأ بـ git init');
+        if (sub === 'init') { if (G.init) return T.print('المستودع موجود أصلاً ✓', 'dim'); G.init = true; return T.print('✅ صار هذا المجلد مستودع git (صندوق يحفظ كل نسخة من عملك)', 'pr'); }
+        if (sub === 'status') {
+          const st = Object.keys(G.staged), ch = changed(T), ig = ignored(T).filter(k => k in files(T));
+          if (st.length) { T.print('<span class="pr">جاهز للحفظ (staged):</span>'); st.forEach(k => T.print('   ✅ ' + esc(k))); }
+          if (ch.length) { T.print('<span class="er">تغيّر ولم يُجهّز بعد:</span>'); ch.forEach(k => T.print('   ✏️ ' + esc(k))); }
+          if (ig.length) T.print('مُتجاهَل بسبب .gitignore: ' + esc(ig.join('، ')), 'dim');
+          if (!st.length && !ch.length) T.print('لا شيء جديد. كل شيء محفوظ ✓', 'dim');
+          return;
+        }
+        if (sub === 'add') {
+          const f = files(T), ig = ignored(T), what = a[1];
+          if (!what) return T.err('git add: اكتب اسم الملف، أو نقطة . لكل الملفات');
+          const list = what === '.' ? Object.keys(f).filter(k => !ig.includes(k)) : [what];
+          for (const k of list) { if (!(k in f)) return T.err('git add: لا يوجد ملف اسمه «' + k + '»'); if (ig.includes(k) && what !== '.') { T.err('git add: «' + k + '» مذكور في .gitignore فلن يُضاف 🛡️'); continue; } G.staged[k] = f[k]; }
+          return T.print('جُهّز للحفظ: ' + esc(Object.keys(G.staged).join('، ') || '(لا شيء)'), 'dim');
+        }
+        if (sub === 'commit') {
+          const m = raw.match(/-m\s+["']([^"']*)["']/) || raw.match(/-m\s+(\S+)/); if (!m) return T.err('git commit: أضف رسالة تصف ما فعلت: git commit -m "رسالتك"');
+          const ks = Object.keys(G.staged); if (!ks.length) return T.err('git commit: لم تجهّز شيئاً. استخدم git add أولاً');
+          const id = hex(); G.commits.unshift({ id, msg: m[1], diff: ks.map(k => '+++ ' + k + '\n' + G.staged[k].split('\n').map(l => '+ ' + l).join('\n')).join('\n') });
+          ks.forEach(k => G.snap[k] = G.staged[k]); G.staged = {};
+          return T.print('💾 حُفظت النسخة <span class="hl">' + id + '</span>: ' + esc(m[1]) + ' (' + ks.length + ' ملف)', 'pr');
+        }
+        if (sub === 'log') { if (!G.commits.length) return T.print('لا توجد نسخ محفوظة بعد.', 'dim'); G.commits.forEach(c => T.print('<span class="hl">' + esc(c.id) + '</span>  ' + esc(c.msg))); return; }
+        if (sub === 'show') { const c = G.commits.find(x => x.id === a[1]) || (!a[1] && G.commits[0]); if (!c) return T.err('git show: لا توجد نسخة رقمها «' + (a[1] || '') + '». انظر git log'); T.print('<span class="hl">النسخة ' + esc(c.id) + '</span>: ' + esc(c.msg)); (c.diff || '').split('\n').forEach(l => T.print(esc(l), /^\+/.test(l) ? 'pr' : /^-/.test(l) ? 'er' : '')); return; }
+        if (sub === 'push') { if (!G.commits.length) return T.err('git push: لا توجد نسخ لرفعها. احفظ نسخة أولاً بـ commit'); T.print('⬆️ رُفعت ' + G.commits.length + ' نسخة إلى GitHub', 'pr'); if (G.remote) T.print('🌍 موقعك منشور على: <span class="hl">' + esc(G.remote) + '</span>'); return; }
+        T.err('git: لا أعرف «' + sub + '». جرّب: init أو status أو add أو commit أو log أو show أو push');
+      }
+    },
+    G
+  };
 };
