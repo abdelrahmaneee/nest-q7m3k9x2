@@ -151,6 +151,8 @@ const Prof = (() => {
   return {
     get: () => p,
     list() { return PIDS.filter(id => p.list[id] && !p.list[id].hide && !p.list[id].del).map(id => Object.assign({ id }, p.list[id])); },
+    /* players in the brothers' competition (a learner such as a parent can stay out of it) */
+    comp() { return Prof.list().filter(x => !x.nc); },
     one: id => (p.list[id] && !p.list[id].del) ? p.list[id] : null,
     mergeIn(x) { const m = mergeProf(p, x); const ch = !same(m, p); p = m; LS.set(K_PROF, p); if (ch) ls.forEach(f => f()); return ch; },
     replace(x) { p = migrateProf(x); LS.set(K_PROF, p); ls.forEach(f => f()); },

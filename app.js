@@ -153,7 +153,7 @@ const App = {
   weekStart(t) { const d = new Date(t || now()); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 1) % 7)); return d.getTime(); },
   /* family league: weekly XP per player, shared-goal bonus and crowns */
   league() {
-    const ps = Prof.list(); const goal = (Coach.get().goal && Coach.get().goal.n) || 400;
+    const ps = Prof.comp(); const goal = (Coach.get().goal && Coach.get().goal.n) || 400;
     const base = {}; ps.forEach(p => { base[p.id] = App.xpItems(Kid.of(p.id)).it; });
     const wk = t => App.weekStart(t);
     const weeks = {}; // weekStart -> {pid: xp}
@@ -174,7 +174,7 @@ const App = {
     const k = pid ? Kid.of(pid) : Kid.get();
     const units = C.units;
     const { it, active } = App.xpItems(k);
-    const lg = Prof.list().length > 1 ? App.league() : null;
+    const lg = Prof.comp().length > 1 ? App.league() : null;
     let xp = it.reduce((a, b) => a + b[1], 0) + (lg && lg.bonus[pid] || 0);
     const ws = App.weekStart(); const week = it.filter(x => x[0] >= ws).reduce((a, b) => a + b[1], 0);
     const lessonsDone = {}; for (const key in k.L) if (k.L[key].d) lessonsDone[key] = 1;
@@ -216,7 +216,7 @@ const App = {
       if (Object.keys(k.W).length >= 5) give('weekly5');
       if (D.crowns >= 3) give('crowns3');
       const pid = Kid.pid();
-      if (Prof.list().length > 1 && pid !== 'kt') {
+      if (Prof.comp().length > 1 && Prof.comp().some(x => x.id === pid)) {
         const lg = App.league(); let goals = 0, run = 0, best = 0;
         Object.keys(lg.weeks).map(Number).sort().forEach(w => { const W = lg.weeks[w]; const sum = Object.values(W).reduce((a, b) => a + b, 0); if (sum >= lg.goal && W[pid]) goals++; if (w < lg.cur) { const r = Object.entries(W).sort((a, b) => b[1] - a[1]); const win = r[0] && r[0][0] === pid && (!r[1] || r[0][1] > r[1][1]); run = win ? run + 1 : 0; best = Math.max(best, run); } });
         if (goals >= 5) give('goals5'); if (best >= 2) give('win2');
@@ -300,7 +300,7 @@ const App = {
     const D = App.derive();
     const items = [['map', 'map', 'الرحلة'], ['today', 'sun', 'اليوم']];
     if (D.stage2) items.push(['ctf', 'flag', 'الأعلام']);
-    if (Prof.list().length > 1) items.push(['league', 'star', 'الأبطال']);
+    if (Prof.comp().length > 1) items.push(['league', 'star', 'الأبطال']);
     items.push(['me', 'hat', 'ملفي'], ['coach', 'lock', 'المدرب']);
     const map = { unit: 'map', ctfc: 'ctf', next: 'ctf', weekly: 'today', glossary: 'me', look: 'me' };
     const c = map[cur] || cur;
@@ -420,10 +420,10 @@ function buildIndex() {
 const Views = {
   /* ---------- players ---------- */
   who() {
-    const ps = Prof.list(); const fam = Dev.get().fam; const lg = ps.length > 1 ? App.league() : null;
+    const ps = Prof.list(); const fam = Dev.get().fam; const lg = Prof.comp().length > 1 ? App.league() : null;
     let h = '<div style="padding-top:16px;text-align:center">' + Art.eagle('happy', 2, false, { cos: 'classic', col: 'blue' }).replace('class="eagle"', 'class="eagle" style="width:120px"') + '<h1 style="margin:0">' + (ps.length ? 'من سيلعب الآن؟' : 'أهلاً بك في عُقاب!') + '</h1></div>';
     if (!fam) h += '<div class="card"><h3 style="margin-top:0">🔗 رمز الربط من أخيك الكبير</h3><p class="muted" style="margin:0 0 8px">اكتبه مرة واحدة على هذا الجهاز ليظهر حسابك وتقدّمك، ويتابعك أخوك.</p><div class="row" style="flex-wrap:nowrap"><input class="inp mono" id="wfam" dir="ltr" placeholder="XXXX-XXXX-XXXX"><button class="btn" id="wfb">ربط</button></div><p id="wfm" class="muted" style="font-size:.85em;margin:4px 0 0"></p></div>';
-    h += '<div class="players">' + ps.map(p => { const k = Kid.of(p.id); const D = App.derive(p.id); return '<div class="player" data-p="' + p.id + '" role="button" tabindex="0">' + Art.eagle('happy', D.rank, false, App.lookOf(k, false)) + '<b>' + esc(p.name) + (lg && lg.king === p.id ? ' 👑' : '') + '</b><small class="muted">' + esc(App.titleOf(k)) + ' · ' + esc(RANKS[D.rank].n) + '</small></div>'; }).join('') +
+    h += '<div class="players">' + ps.map(p => { const k = Kid.of(p.id); const D = App.derive(p.id); return '<div class="player" data-p="' + p.id + '" role="button" tabindex="0">' + Art.eagle('happy', D.rank, false, App.lookOf(k, false)) + '<b>' + esc(p.name) + (lg && lg.king === p.id ? ' 👑' : '') + (p.nc ? ' 📚' : '') + '</b><small class="muted">' + esc(App.titleOf(k)) + ' · ' + esc(RANKS[D.rank].n) + '</small></div>'; }).join('') +
       (Prof.freeId() && ps.length < 4 ? '<div class="player add" data-new="1" role="button" tabindex="0"><span style="font-size:40px">＋</span>لاعب جديد</div>' : '') + '</div>';
     h += '<div class="sync" id="sync" style="justify-content:center"></div><div style="text-align:center;margin-top:22px"><a class="btn sec" href="#/coach" style="position:relative">' + ic('lock', 20) + 'لوحة المدرب' + (Dev.get().role === 'coach' && Help.pending().length ? '<b class="hdot">' + Help.pending().length + '</b>' : '') + '</a></div>';
     return {
@@ -528,7 +528,7 @@ const Views = {
     const rows = lg.ps.map(p => { const d = App.derive(p.id); return { p, d, w: lg.thisWeek[p.id] || 0, k: Kid.of(p.id) }; }).sort((a, b) => b.w - a.w);
     const max = Math.max(50, ...rows.map(x => x.w));
     const ws = new Date(lg.cur), we = new Date(lg.cur + 6 * 864e5);
-    let h = '<h1>🏆 لوحة الأبطال</h1><p class="muted">سباق هذا الأسبوع (' + ws.getDate() + ' ' + MONTHS[ws.getMonth()] + ' ← ' + we.getDate() + ' ' + MONTHS[we.getMonth()] + '). من يجمع أكثر نقاط حتى نهاية الجمعة يلبس <b>التاج 👑</b> طوال الأسبوع القادم!</p>';
+    let h = (Prof.one(Kid.pid()) && Prof.one(Kid.pid()).nc ? '<div class="card" style="background:var(--warn-bg)">📚 أنت تتعلّم <b>خارج المنافسة</b>: نقاطك لا تدخل هنا. يمكنك متابعة سباق الإخوة وتشجيعهم!</div>' : '') + '<h1>🏆 لوحة الأبطال</h1><p class="muted">سباق هذا الأسبوع (' + ws.getDate() + ' ' + MONTHS[ws.getMonth()] + ' ← ' + we.getDate() + ' ' + MONTHS[we.getMonth()] + '). من يجمع أكثر نقاط حتى نهاية الجمعة يلبس <b>التاج 👑</b> طوال الأسبوع القادم!</p>';
     h += '<div class="card">' + rows.map((x, i) => '<div class="league-row">' + '<b style="font-size:1.4em;width:28px;text-align:center">' + (i === 0 && x.w ? '🥇' : i === 1 && x.w ? '🥈' : (i + 1)) + '</b>' + Art.eagle('happy', x.d.rank, false, App.lookOf(x.k, false)) + '<div style="flex:1"><b>' + esc(x.p.name) + (lg.king === x.p.id ? ' <span class="crown">👑</span>' : '') + (x.p.id === Kid.pid() ? ' <small class="muted">(أنت)</small>' : '') + ' <small class="muted">· ' + esc(App.titleOf(x.k)) + '</small></b><div class="bar"><i style="width:' + Math.round(x.w / max * 100) + '%"></i></div><small class="muted"><bdi>' + x.w + ' XP</bdi> هذا الأسبوع</small></div></div>').join('') + '</div>';
     const gp = Math.min(100, Math.round(lg.sumNow / lg.goal * 100));
     h += '<div class="card" style="border-color:var(--gold)"><h3 style="margin-top:0">🤝 هدف الإخوة المشترك</h3><p style="margin:0">اجمعوا معاً <b><bdi>' + lg.goal + ' XP</bdi></b> هذا الأسبوع، فيحصل <b>كل من شارك</b> على <b>+30 XP</b> هدية!</p><div class="bar" style="height:18px;margin-top:8px"><i style="width:' + gp + '%"></i></div><small class="muted"><bdi>' + lg.sumNow + ' / ' + lg.goal + '</bdi> ' + (lg.sumNow >= lg.goal ? '✅ تحقّق الهدف!' : '') + '</small></div>';
@@ -917,7 +917,7 @@ const Typing = {
         '<div class="wbox typing"><div class="target" id="tw"></div><input class="inp mono" id="ti" dir="ltr" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ابدأ الكتابة هنا" style="margin-top:10px;text-align:center"><div class="row" style="justify-content:space-around;margin-top:10px"><div><b id="tok">0</b> كلمة صحيحة</div><div><b id="terr">0</b> خطأ</div></div></div><div id="tyres"></div>',
       mount() {
         const inp = $('#ti'); inp.focus();
-        const show = () => { const w = T.words[T.i % T.words.length]; const v = inp.value; let h = ''; for (let j = 0; j < w.length; j++) h += '<span class="' + (j < v.length ? (v[j] === w[j] ? 'd' : '') : j === v.length ? 'c' : '') + '">' + esc(w[j] === ' ' ? ' ' : w[j]) + '</span>'; $('#tw').innerHTML = h + ' <span class="muted" style="font-size:.7em">' + esc(T.words[(T.i + 1) % T.words.length]) + '</span>'; };
+        const show = () => { const w = T.words[T.i % T.words.length]; const v = inp.value; let h = ''; for (let j = 0; j < w.length; j++) h += '<span class="' + (j < v.length ? (v[j] === w[j] ? 'd' : 'x') : j === v.length ? 'c' : 'n') + '">' + esc(w[j] === ' ' ? ' ' : w[j]) + '</span>'; $('#tw').innerHTML = h + ' <span class="muted" style="font-size:.7em">' + esc(T.words[(T.i + 1) % T.words.length]) + '</span>'; };
         show();
         $('[data-y="exit"]').onclick = () => { clearInterval(T.timer); App.go('today'); };
         inp.addEventListener('input', () => {

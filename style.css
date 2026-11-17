@@ -132,7 +132,8 @@ nav.tabs a[aria-current="page"]{color:var(--primary);background:var(--bg)}
 
 /* terminal */
 .terminal{background:var(--term-bg);color:var(--term-ink);border-radius:16px;padding:12px;font-family:var(--f-mono);font-size:15px;line-height:1.55;direction:ltr;text-align:left;min-height:200px;max-height:360px;overflow:auto;border:2px solid #22324F;box-shadow:var(--shadow)}
-.terminal .ln{white-space:pre-wrap;word-break:break-word}
+.terminal .ln{white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text}
+.terminal ::selection{background:#FFD36B;color:#111}
 .terminal .pr{color:var(--term-ok)}
 .terminal .er{color:#FF8A8A}
 .terminal .dim{color:#7F93B5}
@@ -195,8 +196,12 @@ nav.tabs a[aria-current="page"]{color:var(--primary);background:var(--bg)}
 
 /* type game */
 .typing .target{font-family:var(--f-mono);direction:ltr;font-size:1.3em;letter-spacing:.06em;text-align:center;padding:10px;background:var(--bg);border-radius:12px}
+.typing .target{font-size:1.7em;font-weight:700}
+.typing .target .n{color:var(--ink)}
 .typing .target .d{color:var(--ok)}
-.typing .target .c{background:var(--gold2);border-radius:4px}
+.typing .target .x{background:var(--bad);color:#fff;border-radius:5px}
+.typing .target .c{background:var(--gold);color:#1A1200;border-radius:6px;padding:0 2px;box-shadow:0 0 0 3px var(--gold2);text-decoration:underline 3px;text-underline-offset:5px;animation:tcur 1s ease-in-out infinite}
+@keyframes tcur{50%{box-shadow:0 0 0 5px var(--gold2)}}
 
 /* profile */
 .hatbox{display:flex;flex-direction:column;align-items:center;text-align:center}

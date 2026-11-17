@@ -155,7 +155,8 @@ const Term = {
       else Snd.key();
     });
     $('.keybar', el).onclick = e => { const b = e.target.closest('[data-k]'); if (!b) return; const k = b.dataset.k; if (k === 'Tab') tab(); else if (k === '↑') { if (T.hi > 0) { T.hi--; inp.value = T.hist[T.hi] || ''; } } else inp.value += k; inp.focus(); };
-    box.onclick = () => inp.focus({ preventScroll: true });
+    /* click focuses the prompt, but never steals a text selection (so flags can be copied) */
+    box.onclick = () => { const sel = window.getSelection && String(window.getSelection()); if (sel) return; inp.focus({ preventScroll: true }); };
     T.home0 = T.user;
     paint();
     if (opts.motd) T.print(opts.motd, 'dim');
