@@ -39,6 +39,9 @@ const fmtTime = t => { const d = new Date(t); let h = d.getHours(), m = d.getMin
 function md(s) {
   if (!s) return '';
   let o = esc(s);
+  /* fenced blocks ```...``` keep their lines and spacing (left-to-right, monospace) */
+  const pres = [];
+  o = o.replace(/```\n?([\s\S]*?)\n?```/g, (m, c) => { pres.push('<pre class="mdpre" dir="ltr">' + c + '</pre>'); return '\u0000' + (pres.length - 1) + '\u0000'; });
   o = o.replace(/`([^`]+)`/g, (m, c) => '<code>' + c + '</code>');
   o = o.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
   o = o.replace(/\[\[([a-z0-9_]+)(?:\|([^\]]+))?\]\]/g, (m, id, shown) => {
@@ -49,6 +52,7 @@ function md(s) {
     return '<span class="term" data-term="' + id + '" tabindex="0">' + label + (t.en && !shown ? ' <span class="mono" style="font-weight:500">(' + esc(t.en) + ')</span>' : '') + '</span>';
   });
   o = o.replace(/\n/g, '<br>');
+  o = o.replace(/\u0000(\d+)\u0000/g, (m, i) => pres[+i]);
   return o;
 }
 

@@ -6,7 +6,7 @@
   --term-bg:#0E1626;--term-ink:#CFE3FF;--term-ok:#5BE39B;--code-bg:#F3F6FB;
   --radius:18px;--shadow:0 6px 0 rgba(20,33,61,.08),0 10px 24px rgba(20,33,61,.08);
   --f-head:"Baloo Bhaijaan 2","Tajawal",system-ui,sans-serif;--f-body:"Tajawal","Segoe UI",Tahoma,system-ui,sans-serif;
-  --f-mono:ui-monospace,"Cascadia Mono","Consolas","Menlo",monospace;
+  --f-mono:ui-monospace,"Cascadia Mono","Consolas","Menlo","Tajawal","Noto Sans Arabic",monospace;
   --fs:17px;
 }
 :root[data-stage="2"]{
@@ -356,3 +356,6 @@ table.t th{color:var(--muted);font-size:.85em}
 .hq.done{opacity:.7;border-inline-start-color:var(--line)}
 .modal .hq{border:2px solid var(--line);border-inline-start:5px solid var(--gold);border-radius:12px;padding:8px 10px;margin:6px 0}
 .modal .hq.done{border-inline-start-color:var(--ok)}
+
+.mdpre{font-family:var(--f-mono,ui-monospace,Menlo,monospace);font-size:.86em;line-height:1.5;background:rgba(0,0,0,.06);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;white-space:pre;overflow-x:auto;text-align:left;unicode-bidi:plaintext}
+[data-stage="2"] .mdpre,[data-th="night"] .mdpre{background:rgba(255,255,255,.06)}
