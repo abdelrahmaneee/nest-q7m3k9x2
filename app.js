@@ -241,7 +241,7 @@ const App = {
     const s2 = !!pid && d.stage2 && !!(sn && sn.stage2) || (App.preview && d.stage2);
     if (s2) r.dataset.stage = '2'; else delete r.dataset.stage;
     const k = Kid.get(); const l1 = App.lookOf(k, false), l2 = App.lookOf(k, true);
-    if (pid && l1.th !== 'sky') r.dataset.th = l1.th; else delete r.dataset.th;
+    if (pid && !s2 && l1.th !== 'sky') r.dataset.th = l1.th; else delete r.dataset.th; // day colours never mix with the dark stage
     if (pid && l2.th !== 'neon') r.dataset.th2 = l2.th; else delete r.dataset.th2;
     return d;
   },
@@ -264,7 +264,7 @@ const App = {
     if (r[0] === 'who' && Kid.pid() && Kid.get().pledge && !App.preview) { Kid.use(null); }
     App.route = r;
     const D = App.applyStage();
-    const views = { who: Views.who, newplayer: Views.newplayer, map: Views.map, unit: Views.unit, lesson: Views.lesson, test: Views.test, today: Views.today, review: Views.review, typing: Views.typing, glossary: Views.glossary, me: Views.me, look: Views.look, league: Views.league, coach: CoachUI.view, coachsetup: CoachUI.setup, ctf: Views.ctf, ctfc: Views.ctfc, next: Views.next, weekly: Views.weekly };
+    const views = { night: Views.night, who: Views.who, newplayer: Views.newplayer, map: Views.map, unit: Views.unit, lesson: Views.lesson, test: Views.test, today: Views.today, review: Views.review, typing: Views.typing, glossary: Views.glossary, me: Views.me, look: Views.look, league: Views.league, coach: CoachUI.view, coachsetup: CoachUI.setup, ctf: Views.ctf, ctfc: Views.ctfc, next: Views.next, weekly: Views.weekly };
     const v = views[r[0]] || Views.map;
     const app = $('#app');
     const out = v(r, D) || {};
@@ -363,7 +363,7 @@ const App = {
       if (preview) { App.applyStage(); App.go('coach'); App.render(); return; }
       const s = (Dev.get().seen || {})[App.seenKey()];
       if (s) { if (kind === 'medal') s.medals[val] = 1; else if (kind === 'rank') s.rank = val; else if (kind === 'stage2') s.stage2 = true; else if (kind === 'crown') s.crowns = val; Dev.save(); }
-      if (kind === 'stage2') { App.applyStage(); App.go('ctf'); } else App.render();
+      if (kind === 'stage2') { App.applyStage(); App.go('night'); } else App.render();
     };
     if (kind === 'stage2') {
       el.classList.add('stage2-intro');
@@ -497,11 +497,12 @@ const Views = {
     };
   },
   /* wardrobe pickers: stage 1 (day) or stage 2 (night) */
-  lookPickers(night, D) {
+  lookPickers(night, D, noTheme) {
     const s = night ? 's2' : 's1'; const cat = Art.LOOKS[s]; const L = App.lookOf(Kid.get(), night);
     let h = '<div class="card"><h3 style="margin-top:0">' + (night ? '🌙 زيّ عُقاب الليلي' : '🦅 زيّ عُقاب') + '</h3><div class="picks">' + cat.cos.map(c => { const open = App.lookOpen(c[2], D); return '<button class="pick' + (L.cos === c[0] ? ' on' : '') + (open ? '' : ' lock') + '" data-lk="' + s + '" data-k="cos" data-v="' + c[0] + '" data-open="' + (open ? 1 : 0) + '" data-req="' + esc(Views.reqText(c[2])) + '">' + (open ? '' : '<span class="lk">🔒</span>') + Art.eagle('happy', 3, night, { cos: c[0], col: L.col }) + '<br>' + c[1] + '</button>'; }).join('') + '</div>';
     h += '<h3>🎨 لون الريش</h3><div class="picks">' + cat.col.map(c => '<button class="pick' + (L.col === c ? ' on' : '') + '" data-lk="' + s + '" data-k="col" data-v="' + c + '" data-open="1"><span class="dot" style="background:linear-gradient(135deg,' + Art.COLORS[c][1] + ' 50%,' + Art.COLORS[c][0] + ' 50%)"></span><br>' + Art.COLORS[c][2] + '</button>').join('') + '</div>';
     const TH = { sky: ['#EAF1FB', '#1E4FA6', '#F2A51A'], forest: ['#EAF6EE', '#1E7A4A', '#F2A51A'], sunset: ['#FFF1E8', '#C2410C', '#F2A51A'], candy: ['#FBEFFB', '#9D2FA8', '#F2A51A'], desert: ['#FBF5E6', '#8A5A00', '#14A37F'], neon: ['#0A0F1F', '#2BD67B', '#FFC53D'], synth: ['#140A22', '#F04CC8', '#7CF0C0'], ice: ['#06141F', '#2BC8F0', '#FFC53D'], ember: ['#1A0A08', '#FF7A3D', '#FFC53D'] };
+    if (noTheme) return h + '</div>';
     h += '<h3>🖌️ ألوان الصفحة</h3><div class="picks">' + cat.th.map(t => '<button class="pick' + (L.th === t[0] ? ' on' : '') + '" data-lk="' + s + '" data-k="th" data-v="' + t[0] + '" data-open="1"><span class="sw">' + TH[t[0]].map(c => '<i style="background:' + c + '"></i>').join('') + '</span>' + t[1] + '</button>').join('') + '</div></div>';
     return h;
   },
@@ -518,9 +519,18 @@ const Views = {
     h += '<div style="text-align:center">' + Art.eagle('happy', D.rank, false).replace('class="eagle"', 'class="eagle" style="width:120px"') + (D.stage2 ? Art.eagle('happy', D.rank, true).replace('class="eagle"', 'class="eagle" style="width:120px"') : '') + '</div>';
     const curT = (Kid.get().look && Kid.get().look.title) || 't0';
     h += '<div class="card"><h3 style="margin-top:0">🏷️ لقبي <small class="muted">(يظهر تحت اسمك)</small></h3><div class="tagbox">' + TITLES.map(t => { const open = !t[2] || !!Kid.get().M[t[2].medal]; return '<button class="tag' + (curT === t[0] ? ' sel' : '') + '" data-title="' + t[0] + '" data-open="' + (open ? 1 : 0) + '" data-req="' + esc(t[2] ? 'يُفتح بميدالية «' + MEDALS[t[2].medal].n + '»' : '') + '">' + (open ? '' : '🔒 ') + esc(t[1]) + '</button>'; }).join('') + '</div></div>';
-    h += Views.lookPickers(false, D);
-    h += D.stage2 ? Views.lookPickers(true, D) : '<div class="card" style="opacity:.7"><h3 style="margin-top:0">🌙 الخزانة الليلية</h3><p class="muted" style="margin:0">أزياء وألوان خاصة بالمرحلة الثانية (النينجا، صاحب القلنسوة، السايبورغ، الظل...). تُفتح مع صيد الأعلام.</p></div>';
+    if (D.stage2) h += Views.lookPickers(true, D) + '<details class="card" style="padding:10px 14px"><summary style="cursor:pointer;font-weight:800">🌞 زيّ المرحلة الأولى <small class="muted">(يظهر في لوحة الأبطال)</small></summary>' + Views.lookPickers(false, D, true) + '</details>';
+    else h += Views.lookPickers(false, D);
+    h += D.stage2 ? '' : '<div class="card" style="opacity:.7"><h3 style="margin-top:0">🌙 الخزانة الليلية</h3><p class="muted" style="margin:0">أزياء وألوان خاصة بالمرحلة الثانية (النينجا، صاحب القلنسوة، السايبورغ، الظل...). تُفتح مع صيد الأعلام.</p></div>';
     return { html: h, mount() { Views.mountPickers(); $$('[data-title]').forEach(b => b.onclick = () => { if (b.dataset.open !== '1') { Snd.bad(); toast('🔒 ' + b.dataset.req); return; } Kid.setLook({ title: b.dataset.title }); Snd.ok(); App.render(); }); } };
+  },
+  /* ---------- stage 2 welcome: pick the night look ---------- */
+  night(r, D) {
+    if (!D.stage2) { setTimeout(() => App.go('map')); return {}; }
+    let h = '<div class="hero" style="text-align:center;display:block"><div style="width:150px;margin:0 auto">' + Art.eagle('wow', D.rank, true) + '</div><h1 style="margin:6px 0">🌙 مرحباً بك في المرحلة الثانية!</h1><p class="muted" style="margin:0">قبل أن تبدأ صيد الأعلام، اختر مظهرك الليلي: زيّ عُقاب، ولون ريشه، وألوان الصفحة. كلها مصمّمة لتكون واضحة في الوضع الليلي.</p></div>';
+    h += Views.lookPickers(true, D);
+    h += '<button class="btn wide" id="go2" style="margin-top:10px">🚩 ابدأ صيد الأعلام</button><p class="muted" style="text-align:center">تستطيع تغيير مظهرك في أي وقت من «ملفي ← خزانتي».</p>';
+    return { html: h, mount() { Views.mountPickers(); $('#go2').onclick = () => { Snd.ok(); App.go('ctf'); }; } };
   },
   /* ---------- family league ---------- */
   league(r, D) {
@@ -671,7 +681,7 @@ const Views = {
     h += '<div class="sec-h"><h2>الميداليات</h2><small class="muted">' + Object.keys(k.M).filter(m => MEDALS[m]).length + ' من ' + Object.keys(MEDALS).length + '</small></div>';
     for (const dm in DOMAINS) {
       const ms = Object.keys(MEDALS).filter(m => MEDALS[m].d === dm); if (!ms.length) continue;
-      h += '<h3 style="color:' + DOMAINS[dm][1] + '">' + DOMAINS[dm][0] + '</h3><div class="medals">' + ms.map(m => '<div class="medal ' + (k.M[m] ? '' : 'no') + '">' + Art.medal(MEDALS[m].ic, DOMAINS[dm][1], !!k.M[m]) + '<b>' + esc(MEDALS[m].n) + '</b><small>' + esc(MEDALS[m].how) + '</small></div>').join('') + '</div>';
+      h += '<h3 style="border-inline-start:6px solid ' + DOMAINS[dm][1] + ';padding-inline-start:10px;border-radius:3px">' + DOMAINS[dm][0] + '</h3><div class="medals">' + ms.map(m => '<div class="medal ' + (k.M[m] ? '' : 'no') + '">' + Art.medal(MEDALS[m].ic, DOMAINS[dm][1], !!k.M[m]) + '<b>' + esc(MEDALS[m].n) + '</b><small>' + esc(MEDALS[m].how) + '</small></div>').join('') + '</div>';
     }
     h += '<div class="sec-h"><h2>الشهادات</h2></div><div class="card">' +
       (k.X.p_final2 ? '<button class="btn gold" data-act="cert" data-v="1">' + ic('dl', 20) + 'شهادة المرحلة الأولى (PDF)</button>' : '<p class="muted">🔒 شهادة المرحلة الأولى: بعد المشروع الكبير الثاني.</p>') +

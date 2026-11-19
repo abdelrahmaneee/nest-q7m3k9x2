@@ -3,7 +3,7 @@
 const Term = {
   DEFAULT_FS: () => ({
     home: { oqab: { 'hello.txt': 'أهلاً! هذا أول ملف تقرؤه في الطرفية.\nأحسنت يا بطل.', 'todo.txt': '1. أتعلّم الطرفية\n2. أتعلّم Python\n3. أصير خبير أمن', games: { 'chess.txt': 'لعبة الشطرنج: 0 فوز، 0 خسارة' }, pictures: { 'eagle.png': '[صورة عُقاب]', 'trip.png': '[صورة الرحلة]' }, school: { 'math.txt': '2 + 2 = 4\n10 × 10 = 100' } } },
-    etc: { 'hostname': 'oqab-nest' }, tmp: {}
+    etc: { 'hostname': 'nest' }, tmp: {}
   }),
   /* fs spec: "text" = file; {$:"text", p:"rw-------", o:"root"} = file with owner/permissions; {"@":{p,o}, ...} = folder meta */
   build(spec, owner) {

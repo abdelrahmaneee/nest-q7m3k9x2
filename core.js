@@ -283,6 +283,7 @@ const Sync = (() => {
     for (const k in subs) { try { subs[k](); } catch (e) { } delete subs[k]; }
     for (const k in remote) delete remote[k];
     if (!Dev.get().fam) { state = 'local'; paint(); return; }
+    if (!window.FIREBASE_CONFIG || !window.FIREBASE_CONFIG.apiKey) { fail(); return; } // no cloud configured: device-only mode
     try { await api.init(window.FIREBASE_CONFIG); sub('coach'); sub('p'); watchKids(); } catch (e) { fail(); }
   }
   function schedule() { if (!api || !Dev.get().fam || App.preview) return; clearTimeout(t); t = setTimeout(push, 2500); }
