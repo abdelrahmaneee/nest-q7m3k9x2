@@ -198,7 +198,14 @@ const App = {
     const cu = Coach.stage2(pid); if (cu === 'open') stage2 = true; if (cu === 'lock') stage2 = false;
     const solved = Object.keys(k.C).filter(id => k.C[id].d && C.ctf.some(x => x.id === id));
     const crowns = lg ? (lg.crowns[pid] || 0) : 0, king = lg ? lg.king === pid : false;
-    return { xp, week, rank, streak, active, st, stage2, solved, lessonsDone, crowns, king };
+    /* night points: flags + part-3 work (everything after final2) — opens the night wardrobe */
+    let np = 0; const i2 = units.findIndex(u => u.id === 'final2');
+    units.slice(i2 + 1).forEach(u => {
+      u.lessons.forEach(l => { const r = k.L[u.id + '.' + l.id]; if (r && r.d) np += 20; });
+      if (u.project) { if (k.X['p_' + u.id]) np += 200; } else if (k.T[u.id] && k.T[u.id].p) np += 100 + Math.max(0, (k.T[u.id].b || 0) - 80) * 2;
+    });
+    for (const id in k.C) if (k.C[id].d) { const ch = C.ctf.find(x => x.id === id); if (ch) np += Math.max(Math.round(ch.pts / 2), ch.pts - 15 * (k.C[id].h || 0)); }
+    return { xp, week, rank, streak, active, st, stage2, solved, lessonsDone, crowns, king, np };
   },
   pname(pid) { return pid === 'kt' ? 'المختبِر 🧪' : pid === 'demo' ? 'لاعب جديد' : ((Prof.one(pid) || {}).name || ''); },
   titleOf(k) { const t = TITLES.find(x => x[0] === ((k && k.look && k.look.title) || 't0')); const ok = t && (!t[2] || (k.M && k.M[t[2].medal])); return ok ? t[1] : TITLES[0][1]; },
@@ -231,7 +238,26 @@ const App = {
     return { cos: cat.cos.some(c => c[0] === v.cos) ? v.cos : cat.cos[0][0], col: cat.col.includes(v.col) ? v.col : cat.col[0], th: cat.th.some(t => t[0] === v.th) ? v.th : cat.th[0][0] };
   },
   look(night) { if (night == null) night = document.documentElement.dataset.stage === '2'; return App.lookOf(Kid.get(), night); },
-  lookOpen(req, D) { if (!req) return true; if (req.medal) return !!Kid.get().M[req.medal]; if (req.rank != null) return D.rank >= req.rank; if (req.crown) return D.crowns >= req.crown || D.king; if (req.flags) return D.solved.length >= req.flags; return true; },
+  lookOpen(req, D) {
+    if (!req) return true;
+    if (req.crown && ((D.crowns || 0) >= req.crown || D.king)) return true;
+    if (req.xp != null) return D.xp >= req.xp;
+    if (req.np != null) return (D.np || 0) >= req.np;
+    if (req.medal) return !!Kid.get().M[req.medal];
+    if (req.rank != null) return D.rank >= req.rank;
+    if (req.flags) return D.solved.length >= req.flags;
+    return false;
+  },
+  /* every wardrobe item of a stage: [kind, id, name, req] */
+  lookItems(s) { const cat = Art.LOOKS[s]; return cat.cos.map(c => ['cos', c[0], c[1], c[2]]).concat(cat.col.map(c => ['col', c, Art.COLORS[c][2], (cat.colReq || {})[c] || null])); },
+  /* the next locked item on the points ladder, with progress */
+  nextLook(night, D) {
+    const s = night ? 's2' : 's1', key = night ? 'np' : 'xp', have = (night ? D.np : D.xp) || 0;
+    const L = App.lookItems(s).filter(x => x[3] && x[3][key] != null && !App.lookOpen(x[3], D)).sort((a, b) => a[3][key] - b[3][key]);
+    if (!L.length) return null;
+    const n = L[0], prev = App.lookItems(s).filter(x => x[3] && x[3][key] != null && x[3][key] <= have).reduce((m, x) => Math.max(m, x[3][key]), 0);
+    return { kind: n[0], id: n[1], name: n[2], need: n[3][key] - have, at: n[3][key], pct: Math.max(4, Math.round((have - prev) / Math.max(1, n[3][key] - prev) * 100)) };
+  },
   rankInfo(xp) { let r = 0; RANKS.forEach((x, i) => { if (xp >= x.x) r = i; }); const nx = RANKS[r + 1]; return { i: r, cur: RANKS[r], next: nx, pct: nx ? Math.round((xp - RANKS[r].x) / (nx.x - RANKS[r].x) * 100) : 100 }; },
   seenKey() { const pid = Kid.pid(); return pid ? pid + '.' + (Kid.get().g || 0) : null; },
   seen() { const sk = App.seenKey(); if (!sk) return null; const d = Dev.get(); d.seen = d.seen || {}; return d.seen[sk] || null; },
@@ -341,13 +367,16 @@ const App = {
     const pid = Kid.pid(); if (!pid || !Kid.get().pledge) return;
     const d = Dev.get(), D = App.derive(), k = Kid.get(), sk = App.seenKey();
     d.seen = d.seen || {};
-    if (!d.seen[sk]) { d.seen[sk] = { rank: D.rank, medals: Object.assign({}, k.M), stage2: D.stage2, crowns: D.crowns }; Dev.save(); return; }
+    const openLooks = () => { const o = {}; ['s1', 's2'].forEach(st => App.lookItems(st).forEach(x => { if (x[3] && App.lookOpen(x[3], D)) o[st + '.' + x[0] + '.' + x[1]] = 1; })); return o; };
+    if (!d.seen[sk]) { d.seen[sk] = { rank: D.rank, medals: Object.assign({}, k.M), stage2: D.stage2, crowns: D.crowns, looks: openLooks() }; Dev.save(); return; }
     const s = d.seen[sk]; const q = [];
+    if (!s.looks) { s.looks = openLooks(); Dev.save(); }
     for (const m in k.M) if (!s.medals[m] && MEDALS[m]) q.push(['medal', m]);
     if (D.rank > s.rank) q.push(['rank', D.rank]);
     if (D.rank < s.rank) { s.rank = D.rank; Dev.save(); }
     if ((D.crowns || 0) > (s.crowns || 0)) q.push(['crown', D.crowns]);
     if (D.stage2 && !s.stage2) q.push(['stage2']);
+    else { const st = D.stage2 ? 's2' : 's1'; const ol = openLooks(); const nw = Object.keys(ol).filter(x => !s.looks[x] && x.startsWith(st + '.')); if (nw.length) q.push(['look', nw[0]]); }
     if (!D.stage2 && s.stage2) { s.stage2 = false; Dev.save(); App.applyStage(); }
     if (!q.length) return;
     const busy = ['lesson', 'test', 'ctfc', 'review', 'typing', 'who', 'newplayer'].includes(App.route[0]) && !App.celeOK;
@@ -362,7 +391,7 @@ const App = {
       el.remove(); App.celeOn = false;
       if (preview) { App.applyStage(); App.go('coach'); App.render(); return; }
       const s = (Dev.get().seen || {})[App.seenKey()];
-      if (s) { if (kind === 'medal') s.medals[val] = 1; else if (kind === 'rank') s.rank = val; else if (kind === 'stage2') s.stage2 = true; else if (kind === 'crown') s.crowns = val; Dev.save(); }
+      if (s) { if (kind === 'medal') s.medals[val] = 1; else if (kind === 'rank') s.rank = val; else if (kind === 'stage2') s.stage2 = true; else if (kind === 'crown') s.crowns = val; else if (kind === 'look') s.looks[val] = 1; Dev.save(); }
       if (kind === 'stage2') { App.applyStage(); App.go('night'); } else App.render();
     };
     if (kind === 'stage2') {
@@ -377,14 +406,15 @@ const App = {
       return;
     }
     const night = document.documentElement.dataset.stage === '2';
-    const prize = kind === 'medal' ? Art.medal(MEDALS[val].ic, (DOMAINS[MEDALS[val].d] || DOMAINS.gen)[1]) : kind === 'crown' ? Art.eagle('happy', 6, night, Object.assign({}, App.look(night), night ? {} : { cos: 'king' })) : Art.hat(val);
-    const title = kind === 'medal' ? 'ميدالية جديدة!' : kind === 'crown' ? 'بطل الأسبوع! 👑' : 'رتبة جديدة!';
-    const sub = kind === 'medal' ? '<p style="font-size:1.4em;font-weight:800">' + esc(MEDALS[val].n) + '</p><p>' + esc(MEDALS[val].how) + '</p>'
+    let lk = null; if (kind === 'look') { const [st, kk, id] = val.split('.'); const it = App.lookItems(st).find(x => x[0] === kk && x[1] === id); const cur = App.lookOf(Kid.get(), st === 's2'); lk = { st, kk, id, name: it ? it[2] : id, look: kk === 'cos' ? { cos: id, col: cur.col } : { cos: cur.cos, col: id } }; }
+    const prize = kind === 'look' ? Art.eagle('happy', 6, lk.st === 's2', lk.look) : kind === 'medal' ? Art.medal(MEDALS[val].ic, (DOMAINS[MEDALS[val].d] || DOMAINS.gen)[1]) : kind === 'crown' ? Art.eagle('happy', 6, night, Object.assign({}, App.look(night), night ? {} : { cos: 'king' })) : Art.hat(val);
+    const title = kind === 'look' ? (lk.kk === 'cos' ? 'زيّ جديد في خزانتك! 👕' : 'لون ريش جديد! 🎨') : kind === 'medal' ? 'ميدالية جديدة!' : kind === 'crown' ? 'بطل الأسبوع! 👑' : 'رتبة جديدة!';
+    const sub = kind === 'look' ? '<p style="font-size:1.4em;font-weight:800">' + esc(lk.name) + '</p><p>جمعت نقاطاً كافية ففتحته! ' + (() => { const n = App.nextLook(lk.st === 's2', App.derive()); return n ? 'التالي: «' + esc(n.name) + '» بعد ' + n.need + ' نقطة.' : 'وفتحت كل شيء في هذه الخزانة 🏆'; })() + '</p>' : kind === 'medal' ? '<p style="font-size:1.4em;font-weight:800">' + esc(MEDALS[val].n) + '</p><p>' + esc(MEDALS[val].how) + '</p>'
       : kind === 'crown' ? '<p>جمعت أكثر نقاط في الأسبوع الماضي! التاج معك طوال هذا الأسبوع، و<b>زي الملك</b> صار مفتوحاً في خزانتك.</p>'
         : '<p style="font-size:1.4em;font-weight:800">' + esc(RANKS[val].n) + '</p><p>قبعتك البيضاء تطوّرت! ' + (RANKS[val + 1] ? 'الرتبة التالية: ' + RANKS[val + 1].n : 'وصلت لأعلى رتبة!') + '</p>';
     el.innerHTML = '<div class="rays"></div><p style="position:relative;opacity:.85">' + (preview ? 'معاينة · ' : '') + 'هدية من عُقاب</p><h2 style="position:relative">اضغط على الهدية لتفتحها</h2>' +
       '<button class="gift" aria-label="افتح الهدية"><svg viewBox="0 0 170 170"><rect x="25" y="70" width="120" height="90" rx="12" fill="#E04B4B" stroke="#7A1A1A" stroke-width="5"/><rect x="77" y="70" width="16" height="90" fill="#FFD36B"/><g class="lid"><rect x="15" y="48" width="140" height="30" rx="10" fill="#FF6B6B" stroke="#7A1A1A" stroke-width="5"/><rect x="77" y="48" width="16" height="30" fill="#FFD36B"/><path d="M85 48 q-30 -36 -40 -8 q10 10 40 8 q30 2 40 -8 q-10 -28 -40 8" fill="#FFD36B" stroke="#C27C00" stroke-width="4"/></g></svg></button>' +
-      '<div class="after hide" style="position:relative"><div class="prize">' + prize + '</div><h2>' + title + '</h2>' + sub + '<button class="btn gold" data-x="ok" style="min-width:200px">' + (preview ? 'إنهاء المعاينة' : 'رائع!') + '</button></div>';
+      '<div class="after hide" style="position:relative"><div class="prize">' + prize + '</div><h2>' + title + '</h2>' + sub + (kind === 'look' && !preview ? '<button class="btn gold" data-x="wear" style="min-width:200px;margin-bottom:8px">👕 ارتدِه الآن</button><br><button class="btn sec" data-x="ok" style="min-width:200px">لاحقاً</button>' : '<button class="btn gold" data-x="ok" style="min-width:200px">' + (preview ? 'إنهاء المعاينة' : 'رائع!') + '</button>') + '</div>';
     document.body.appendChild(el);
     el.addEventListener('click', e => {
       const g = e.target.closest('.gift');
@@ -392,6 +422,7 @@ const App = {
         g.classList.add('open'); Snd.fanfare(); confetti(); if (navigator.vibrate) try { navigator.vibrate([60, 40, 120]); } catch (x) { }
         setTimeout(() => { g.style.display = 'none'; $('h2', el).style.display = 'none'; $('.after', el).classList.remove('hide'); }, 650);
       }
+      if (e.target.closest('[data-x="wear"]') && lk) { const cur = Object.assign({}, (Kid.get().look || {})[lk.st] || {}); cur[lk.kk] = lk.id; Kid.setLook({ [lk.st]: cur }); finish(); return; }
       if (e.target.closest('[data-x="ok"]')) finish();
     });
   },
@@ -459,7 +490,7 @@ const Views = {
         '<button class="btn wide" data-n="2">التالي</button>';
     } else if (st.step === 2) {
       const L = App.lookOf(Kid.get(), false);
-      h += '<div class="mentor">' + Art.eagle('happy', 0) + '<div class="bubble">اختر لوني ولون صفحتك! (تستطيع تغييرهما في أي وقت من «ملفي ← خزانتي»، وستفتح أزياء جديدة كلما ارتفعت رتبتك.)</div></div>' + Views.lookPickers(false, App.derive()) + '<button class="btn wide" data-n="3" style="margin-top:12px">التالي</button>';
+      h += '<div class="mentor">' + Art.eagle('happy', 0) + '<div class="bubble">اختر لوني ولون صفحتك! (تستطيع تغييرهما في أي وقت من «ملفي ← خزانتي»، وستفتح أزياء جديدة كلما جمعت نقاطاً.)</div></div>' + Views.lookPickers(false, App.derive()) + '<button class="btn wide" data-n="3" style="margin-top:12px">التالي</button>';
     } else {
       h += '<div class="mentor">' + Art.eagle('think', 0) + '<div class="bubble">قبل أن ندخل، هذا عهد بيني وبينك. اقرأه جيداً.</div></div>' +
         '<div class="card"><h2 style="text-align:center">عهد عُقاب</h2>' +
@@ -499,14 +530,17 @@ const Views = {
   /* wardrobe pickers: stage 1 (day) or stage 2 (night) */
   lookPickers(night, D, noTheme) {
     const s = night ? 's2' : 's1'; const cat = Art.LOOKS[s]; const L = App.lookOf(Kid.get(), night);
-    let h = '<div class="card"><h3 style="margin-top:0">' + (night ? '🌙 زيّ عُقاب الليلي' : '🦅 زيّ عُقاب') + '</h3><div class="picks">' + cat.cos.map(c => { const open = App.lookOpen(c[2], D); return '<button class="pick' + (L.cos === c[0] ? ' on' : '') + (open ? '' : ' lock') + '" data-lk="' + s + '" data-k="cos" data-v="' + c[0] + '" data-open="' + (open ? 1 : 0) + '" data-req="' + esc(Views.reqText(c[2])) + '">' + (open ? '' : '<span class="lk">🔒</span>') + Art.eagle('happy', 3, night, { cos: c[0], col: L.col }) + '<br>' + c[1] + '</button>'; }).join('') + '</div>';
-    h += '<h3>🎨 لون الريش</h3><div class="picks">' + cat.col.map(c => '<button class="pick' + (L.col === c ? ' on' : '') + '" data-lk="' + s + '" data-k="col" data-v="' + c + '" data-open="1"><span class="dot" style="background:linear-gradient(135deg,' + Art.COLORS[c][1] + ' 50%,' + Art.COLORS[c][0] + ' 50%)"></span><br>' + Art.COLORS[c][2] + '</button>').join('') + '</div>';
+    let h = '<div class="card"><h3 style="margin-top:0">' + (night ? '🌙 زيّ عُقاب الليلي' : '🦅 زيّ عُقاب') + '</h3>';
+    const nx = App.nextLook(night, D), have = (night ? D.np : D.xp) || 0;
+    h += '<div class="nextlook"><div class="row" style="justify-content:space-between;gap:8px"><b>' + (night ? '🌙 نقاطك الليلية: ' : '⭐ نقاطك: ') + have + '</b>' + (nx ? '<span>🎁 التالي: «' + esc(nx.name) + '» بعد <b>' + nx.need + '</b> نقطة</span>' : '<span>🏆 فتحت كل ' + (night ? 'الخزانة الليلية' : 'أزياء المرحلة الأولى') + '!</span>') + '</div>' + (nx ? '<div class="bar"><i style="width:' + nx.pct + '%"></i></div>' : '') + (night ? '<small class="muted">النقاط الليلية = نقاط الأعلام 🚩 + دروس واختبارات الجزء الثالث (بناء المواقع).</small>' : '') + '</div>';
+    h += '<div class="picks">' + cat.cos.map(c => { const open = App.lookOpen(c[2], D); return '<button class="pick' + (L.cos === c[0] ? ' on' : '') + (open ? '' : ' lock') + '" data-lk="' + s + '" data-k="cos" data-v="' + c[0] + '" data-open="' + (open ? 1 : 0) + '" data-req="' + esc(Views.reqText(c[2])) + '">' + (open ? '' : '<span class="lk">🔒</span>') + Art.eagle('happy', 3, night, { cos: c[0], col: L.col }) + '<br>' + c[1] + (open || !c[2] ? '' : '<small class="need">' + (c[2].xp != null ? c[2].xp + ' ⭐' : c[2].np != null ? c[2].np + ' 🌙' : '') + '</small>') + '</button>'; }).join('') + '</div>';
+    h += '<h3>🎨 لون الريش</h3><div class="picks">' + cat.col.map(c => { const rq = (cat.colReq || {})[c] || null, open = App.lookOpen(rq, D); return '<button class="pick' + (L.col === c ? ' on' : '') + (open ? '' : ' lock') + '" data-lk="' + s + '" data-k="col" data-v="' + c + '" data-open="' + (open ? 1 : 0) + '" data-req="' + esc(Views.reqText(rq)) + '">' + (open ? '' : '<span class="lk">🔒</span>') + '<span class="dot" style="background:linear-gradient(135deg,' + Art.COLORS[c][1] + ' 50%,' + Art.COLORS[c][0] + ' 50%)"></span><br>' + Art.COLORS[c][2] + (open || !rq ? '' : '<small class="need">' + (rq.xp != null ? rq.xp + ' ⭐' : rq.np + ' 🌙') + '</small>') + '</button>'; }).join('') + '</div>';
     const TH = { sky: ['#EAF1FB', '#1E4FA6', '#F2A51A'], forest: ['#EAF6EE', '#1E7A4A', '#F2A51A'], sunset: ['#FFF1E8', '#C2410C', '#F2A51A'], candy: ['#FBEFFB', '#9D2FA8', '#F2A51A'], desert: ['#FBF5E6', '#8A5A00', '#14A37F'], neon: ['#0A0F1F', '#2BD67B', '#FFC53D'], synth: ['#140A22', '#F04CC8', '#7CF0C0'], ice: ['#06141F', '#2BC8F0', '#FFC53D'], ember: ['#1A0A08', '#FF7A3D', '#FFC53D'] };
     if (noTheme) return h + '</div>';
     h += '<h3>🖌️ ألوان الصفحة</h3><div class="picks">' + cat.th.map(t => '<button class="pick' + (L.th === t[0] ? ' on' : '') + '" data-lk="' + s + '" data-k="th" data-v="' + t[0] + '" data-open="1"><span class="sw">' + TH[t[0]].map(c => '<i style="background:' + c + '"></i>').join('') + '</span>' + t[1] + '</button>').join('') + '</div></div>';
     return h;
   },
-  reqText(r) { if (!r) return ''; if (r.medal) return 'يُفتح بميدالية «' + MEDALS[r.medal].n + '»'; if (r.rank != null) return 'يُفتح عند رتبة «' + RANKS[r.rank].n + '»'; if (r.crown) return 'يُفتح عندما تصبح بطل الأسبوع 👑'; if (r.flags) return 'يُفتح بعد ' + r.flags + ' أعلام'; return ''; },
+  reqText(r) { if (!r) return ''; if (r.xp != null) return 'يُفتح عند ' + r.xp + ' نقطة ⭐' + (r.crown ? ' (أو فوراً إذا صرت بطل الأسبوع 👑)' : ''); if (r.np != null) return 'يُفتح عند ' + r.np + ' نقطة ليلية 🌙'; if (r.medal) return 'يُفتح بميدالية «' + MEDALS[r.medal].n + '»'; if (r.rank != null) return 'يُفتح عند رتبة «' + RANKS[r.rank].n + '»'; if (r.crown) return 'يُفتح عندما تصبح بطل الأسبوع 👑'; if (r.flags) return 'يُفتح بعد ' + r.flags + ' أعلام'; return ''; },
   mountPickers() {
     $$('.pick[data-lk]').forEach(b => b.onclick = () => {
       if (b.dataset.open !== '1') { Snd.bad(); toast('🔒 ' + b.dataset.req); return; }
@@ -676,6 +710,7 @@ const Views = {
   me(r, D) {
     const k = Kid.get(); const ri = App.rankInfo(D.xp); const d = Dev.get();
     let h = '<div class="card hatbox">' + Art.hat(ri.i) + '<h1 style="margin:0">' + esc(k.name || 'البطل') + (D.king ? ' 👑' : '') + '</h1><p style="margin:0;color:var(--primary);font-weight:800">🏷️ ' + esc(App.titleOf(k)) + '</p><p style="margin:0"><b>' + esc(ri.cur.n) + '</b> · <bdi>' + D.xp + ' XP</bdi></p><div class="bar" style="width:100%;max-width:340px"><i style="width:' + ri.pct + '%"></i></div><small class="muted">' + (ri.next ? 'باقي <bdi>' + (ri.next.x - D.xp) + ' XP</bdi> على «' + esc(ri.next.n) + '»' : 'وصلت لأعلى رتبة!') + '</small></div>';
+    { const nx = App.nextLook(D.stage2, D); if (nx) h += '<p class="muted" style="margin:10px 0 4px;text-align:center">🎁 الزي التالي في خزانتك: <b>«' + esc(nx.name) + '»</b> بعد ' + nx.need + ' نقطة' + (D.stage2 ? ' ليلية 🌙' : ' ⭐') + '</p>'; }
     h += '<div class="grid2"><a class="btn gold" href="#/look">👕 خزانتي (الأشكال والألوان)</a><a class="btn sec" href="#/glossary">' + ic('book', 20) + 'قاموسي</a></div>';
     h += '<div class="sec-h"><h2>الرتب</h2></div><div class="ranks">' + RANKS.map((x, i) => '<div class="rk ' + (i === ri.i ? 'cur' : i > ri.i ? 'no' : '') + '">' + (i <= ri.i ? '🎩' : '🔒') + ' ' + esc(x.n) + '<span class="sp" style="flex:1"></span><small>' + x.x + ' XP</small></div>').join('') + '</div>';
     h += '<div class="sec-h"><h2>الميداليات</h2><small class="muted">' + Object.keys(k.M).filter(m => MEDALS[m]).length + ' من ' + Object.keys(MEDALS).length + '</small></div>';

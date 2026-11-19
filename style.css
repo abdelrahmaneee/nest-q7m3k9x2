@@ -323,7 +323,10 @@ table.t th{color:var(--muted);font-size:.85em}
 .pick{border:3px solid var(--line);border-radius:16px;background:var(--card);padding:6px;text-align:center;font-size:.8em;font-weight:800;position:relative}
 .pick svg{width:70px;height:70px}
 .pick.on{border-color:var(--primary2);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary2) 30%,transparent)}
-.pick.lock{opacity:.45}
+.pick.lock{color:var(--muted)}.pick.lock svg,.pick.lock .dot{opacity:.4;filter:grayscale(.7)}
+.pick .need{display:block;font-size:.85em;color:var(--ink);opacity:.85;margin-top:2px}
+.nextlook{background:color-mix(in srgb,var(--primary2) 10%,var(--card));border:2px dashed color-mix(in srgb,var(--primary2) 45%,var(--line));border-radius:14px;padding:8px 12px;margin:0 0 10px;font-size:.9em}
+.nextlook .bar{height:10px;border-radius:9px;background:var(--line);overflow:hidden;margin:6px 0 2px}.nextlook .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--primary),var(--primary2));border-radius:9px}
 .pick .lk{position:absolute;top:4px;left:6px}
 .sw{width:100%;height:46px;border-radius:12px;display:flex;overflow:hidden;border:1px solid rgba(0,0,0,.1)}
 .sw i{flex:1}
