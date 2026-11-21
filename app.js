@@ -106,10 +106,21 @@ const App = {
     document.addEventListener('click', App.onClick);
     document.addEventListener('mouseover', e => { const t = e.target.closest && e.target.closest('.term'); if (t) App.termTip(t, false); });
     document.addEventListener('visibilitychange', () => { if (document.hidden && CoachUI.open) { CoachUI.open = false; App.hiddenLock = true; } else if (!document.hidden && App.hiddenLock) { App.hiddenLock = false; if (App.route[0] === 'coach') App.render(); } });
+    window.addEventListener('error', e => App.err((e.message || 'error') + (e.filename ? ' @' + String(e.filename).split('/').pop().split('?')[0] + ':' + e.lineno : '')));
+    window.addEventListener('unhandledrejection', e => App.err('promise: ' + ((e.reason && (e.reason.message || e.reason)) || '?')));
     App.lastAct = now();
     setInterval(App.tick, 5000);
     if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
     App.render();
+  },
+  err(m, where) {
+    try {
+      m = String(m || '').slice(0, 200); if (!m || /ResizeObserver|Script error|firestore|firebase|network|Failed to fetch|Load failed|QuotaExceeded/i.test(m)) return;
+      App.errN = (App.errN || 0) + 1; if (App.errN > 8) return;
+      const L = Lesson.cur, r = (App.route || []).join('/');
+      const w = where || (r + (App.route && App.route[0] === 'lesson' && L ? ' خطوة ' + (L.i + 1) : ''));
+      console.warn('[oqab]', m, w); Kid.logErr(m, w, (document.querySelector('script[src*="app.js"]') || {}).src ? document.querySelector('script[src*="app.js"]').src.split('v=')[1] : '');
+    } catch (x) { }
   },
   cloudReady(m) { Sync.attach(m); },
   cloudFail() { Sync.fail(); },
@@ -301,7 +312,7 @@ const App = {
     window.scrollTo(0, 0);
     if (out.mount) out.mount();
     App.paintSync();
-    Help.paint();
+    Help.dock(); Help.paint();
     setTimeout(() => { App.checkCele(); App.checkMsgs(); Help.checkReplies(); }, 400);
   },
   topHtml(D) {
@@ -750,24 +761,29 @@ const Lesson = {
     const text = s.m || s.q || '';
     if (text) h += '<div class="mentor">' + Art.eagle(mood, L.rank, night) + '<div class="bubble">' + md(text) + '<div id="simple"></div></div></div>';
     h += '<div id="stage"></div><div id="fb"></div>';
-    h += '<div class="lfoot">' + (s.s ? '<button class="btn sec" data-l="simple">' + ic('bulb', 20) + 'اشرح لي بطريقة أبسط</button>' : '') + '<button class="btn" data-l="next" id="nextBtn"' + (L.ok ? '' : ' disabled') + '>' + (L.i === total - 1 ? 'أنهيت الدرس!' : 'التالي') + '</button></div>';
+    h += '<div class="lfoot">' + (s.s ? '<button class="btn sec" data-l="simple">' + ic('bulb', 20) + 'اشرح لي بطريقة أبسط</button>' : '') + '<button class="btn' + (L.ok ? '' : ' wait') + '" data-l="next" id="nextBtn" aria-disabled="' + (L.ok ? 'false' : 'true') + '">' + (L.i === total - 1 ? 'أنهيت الدرس!' : 'التالي') + '</button></div>';
     const root = $('#lesson'); root.innerHTML = h;
     const stage = $('#stage');
     const api = Lesson.api(s, L);
-    try { Steps.render(s, stage, api, L); } catch (e) { stage.innerHTML = '<div class="feedback bad">حدث خطأ في هذا الجزء. اضغط التالي.</div>'; api.done(); }
+    try { Steps.render(s, stage, api, L); } catch (e) { App.err((e && e.message) || e); stage.innerHTML = '<div class="feedback bad">حدث خطأ في هذا الجزء. اضغط التالي.</div>'; api.done(); }
     root.onclick = e => {
       const b = e.target.closest('[data-l]'); if (!b) return;
       const a = b.dataset.l;
       if (a === 'exit') { if (L.i === 0 || confirm('تخرج من الدرس؟ ستبدأه من جديد لاحقاً.')) App.go('unit/' + L.u.id); }
       if (a === 'simple') { Snd.click(); if (!L.simpleShown) { L.simpleShown = true; Kid.lessonHint(L.key); } $('#simple').innerHTML = '<div class="simpler">' + md(s.s) + '</div>'; }
-      if (a === 'next') { if (!L.ok) return; Snd.click(); if (L.i < total - 1) { L.i++; Lesson.paint(); window.scrollTo(0, 0); } else Lesson.finish(); }
+      if (a === 'next') { if (!L.ok) { Lesson.nudge(); return; } Snd.click(); if (L.i < total - 1) { L.i++; Lesson.paint(); window.scrollTo(0, 0); } else Lesson.finish(); }
     };
+  },
+  /* the player pressed «next» before finishing the exercise: show where to look instead of ignoring the tap */
+  nudge() {
+    Snd.bad(); const st = $('#stage'); toast('⬆️ أكمل التمرين أولاً، ثم اضغط الزر من جديد');
+    if (st) { st.scrollIntoView({ block: 'center', behavior: 'smooth' }); st.classList.remove('shake'); void st.offsetWidth; st.classList.add('shake'); }
   },
   blocking(s) { return ['q', 'in', 'sort', 'order', 'match', 'do', 'sh', 'py'].includes(s.t) || (s.t === 'say' && s.w && s.w.goal); },
   api(s, L) {
     const qid = L.key + '.' + L.i;
     return {
-      done(msg) { L.ok = true; const b = $('#nextBtn'); if (b) { b.disabled = false; b.focus({ preventScroll: true }); } if (msg) Lesson.fb(true, msg); },
+      done(msg) { L.ok = true; const b = $('#nextBtn'); if (b) { b.disabled = false; b.classList.remove('wait'); b.setAttribute('aria-disabled', 'false'); b.focus({ preventScroll: true }); } if (msg) Lesson.fb(true, msg); },
       wrong(tag) { Kid.lessonWrong(L.key, tag || s.tag); },
       fb: Lesson.fb, qid,
       card(ok) { Kid.addCard(qid, ok); },
@@ -782,6 +798,14 @@ const Lesson = {
     f.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   },
   finish() {
+    if (!Lesson.cur || Lesson.cur.finished) return; Lesson.cur.finished = true;
+    try { Lesson.finishIn(); } catch (e) {
+      App.err('finish: ' + ((e && e.message) || e));
+      const L = Lesson.cur; App.lessonKey = null; App.celeOK = true; const el = $('#lesson');
+      if (el) el.innerHTML = '<div style="text-align:center;padding-top:30px"><h1>أحسنت!</h1><p>أنهيت الدرس.</p><div class="row" style="justify-content:center"><a class="btn" href="#/unit/' + L.u.id + '">قائمة الدروس</a><a class="btn sec" href="#/map">الرحلة</a></div></div>';
+    }
+  },
+  finishIn() {
     const L = Lesson.cur; const first = Kid.lessonDone(L.key, L.l.title);
     if (L.l.medal) Kid.medal(L.l.medal);
     if (L.u.project && L.u.lessons.every(x => Kid.get().L[L.u.id + '.' + x.id] && Kid.get().L[L.u.id + '.' + x.id].d)) { if (Kid.flag(L.u.id === 'final' ? 'final' : 'p_' + L.u.id) && L.u.doneMedal) Kid.medal(L.u.doneMedal); }
@@ -878,19 +902,20 @@ const Test = {
       '<p class="muted" style="margin:0">🏅 اختبار إتقان: ' + esc(T.u.title) + ' · محاولة واحدة لكل سؤال</p><h2>' + md(s.q || s.m) + '</h2>' + (s.code ? '<pre class="hexv">' + esc(s.code) + '</pre>' : '');
     if (s.t === 'in') h += '<form class="row" style="flex-wrap:nowrap" id="tf"><input class="inp' + (s.ltr ? ' mono' : '') + '" ' + (s.ltr ? 'dir="ltr"' : '') + ' autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="اكتب إجابتك"><button class="btn">تأكيد</button></form>';
     else h += '<div class="opts">' + shuffle(s.o.map((x, i) => i)).map(i => '<button class="opt" data-i="' + i + '">' + md(s.o[i]) + '</button>').join('') + '</div>';
-    h += '<div id="fb"></div><div class="lfoot"><button class="btn" id="tn" disabled>' + (T.i === T.qs.length - 1 ? 'النتيجة' : 'التالي') + '</button></div>';
+    h += '<div id="fb"></div><div class="lfoot"><button class="btn wait" id="tn" aria-disabled="true">' + (T.i === T.qs.length - 1 ? 'النتيجة' : 'التالي') + '</button></div>';
     const root = $('#test'); root.innerHTML = h;
     const answer = (ok, el) => {
       if (T.answered) return; T.answered = true;
       if (ok) T.right++; else T.wrong.push(s.tag || '');
       Kid.review(qid, ok);
       Lesson.fb(ok, ok ? 'صحيح!' : 'خطأ. ' + (s.t === 'in' ? 'الإجابة: <span class="mono">' + esc([].concat(s.a)[0]) + '</span>' : 'الصحيح: ' + md(s.o[s.a])), s.why);
-      $('#tn').disabled = false;
+      const tn = $('#tn'); tn.classList.remove('wait'); tn.setAttribute('aria-disabled', 'false');
     };
     root.onclick = e => {
       const b = e.target.closest('.opt'); if (b && !T.answered) { const i = +b.dataset.i; b.classList.add(i === s.a ? 'right' : 'wrong'); if (i !== s.a) { const r = $('.opt[data-i="' + s.a + '"]', root); if (r) r.classList.add('right'); } answer(i === s.a); }
       if (e.target.closest('[data-t="exit"]') && confirm('تخرج من الاختبار؟ لن تُحسب هذه المحاولة.')) App.go('unit/' + T.u.id);
-      if (e.target.id === 'tn' && T.answered) { if (T.i < T.qs.length - 1) { T.i++; Test.paint(); window.scrollTo(0, 0); } else Test.finish(); }
+      if (e.target.closest('#tn') && !T.answered) { Snd.bad(); toast('⬆️ اختر إجابة أولاً'); }
+      if (e.target.closest('#tn') && T.answered) { if (T.i < T.qs.length - 1) { T.i++; Test.paint(); window.scrollTo(0, 0); } else Test.finish(); }
     };
     const f = $('#tf'); if (f) { const inp = $('input', f); setTimeout(() => inp.focus({ preventScroll: true }), 50); f.onsubmit = e => { e.preventDefault(); if (!inp.value.trim()) return; inp.disabled = true; const v = norm(inp.value); answer([].concat(s.a).some(a => norm(a) === v)); }; }
   },
@@ -930,12 +955,13 @@ const Review = {
     const root = $('#rev'); let answered = false;
     root.innerHTML = '<div class="lhead"><button class="x" data-r="exit" aria-label="خروج">' + ic('x', 22) + '</button><div class="bar"><i style="width:' + Math.round(R.i / R.qs.length * 100) + '%"></i></div><small class="muted">' + (R.i + 1) + '/' + R.qs.length + '</small></div><p class="muted" style="margin:0">🧠 ' + (R.quick ? 'تحدٍّ سريع' : 'مراجعة: هل تتذكّر؟') + '</p><h2>' + md(s.q || s.m) + '</h2>' + (s.code ? '<pre class="hexv">' + esc(s.code) + '</pre>' : '') +
       (s.t === 'in' ? '<form class="row" style="flex-wrap:nowrap" id="rf"><input class="inp' + (s.ltr ? ' mono' : '') + '" ' + (s.ltr ? 'dir="ltr"' : '') + ' autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn">تأكيد</button></form>' : '<div class="opts">' + shuffle(s.o.map((x, i) => i)).map(i => '<button class="opt" data-i="' + i + '">' + md(s.o[i]) + '</button>').join('') + '</div>') +
-      '<div id="fb"></div><div class="lfoot"><button class="btn" id="rn" disabled>' + (R.i === R.qs.length - 1 ? 'إنهاء' : 'التالي') + '</button></div>';
-    const answer = ok => { if (answered) return; answered = true; if (ok) R.right++; if (!R.quick) Kid.review(qid, ok); Lesson.fb(ok, ok ? 'تتذكّرها! ممتاز' : 'لا بأس، ستعود إليك غداً. ' + (s.t === 'in' ? 'الإجابة: <span class="mono">' + esc([].concat(s.a)[0]) + '</span>' : 'الصحيح: ' + md(s.o[s.a])), s.why); $('#rn').disabled = false; };
+      '<div id="fb"></div><div class="lfoot"><button class="btn wait" id="rn" aria-disabled="true">' + (R.i === R.qs.length - 1 ? 'إنهاء' : 'التالي') + '</button></div>';
+    const answer = ok => { if (answered) return; answered = true; if (ok) R.right++; if (!R.quick) Kid.review(qid, ok); Lesson.fb(ok, ok ? 'تتذكّرها! ممتاز' : 'لا بأس، ستعود إليك غداً. ' + (s.t === 'in' ? 'الإجابة: <span class="mono">' + esc([].concat(s.a)[0]) + '</span>' : 'الصحيح: ' + md(s.o[s.a])), s.why); { const rn = $('#rn'); rn.classList.remove('wait'); rn.setAttribute('aria-disabled', 'false'); } };
     root.onclick = e => {
       const b = e.target.closest('.opt'); if (b && !answered) { const i = +b.dataset.i; b.classList.add(i === s.a ? 'right' : 'wrong'); answer(i === s.a); }
       if (e.target.closest('[data-r="exit"]')) App.go('today');
-      if (e.target.id === 'rn' && answered) { if (R.i < R.qs.length - 1) { R.i++; Review.paint(); } else Review.finish(); }
+      if (e.target.closest('#rn') && !answered) { Snd.bad(); toast('⬆️ أجب أولاً'); }
+      if (e.target.closest('#rn') && answered) { if (R.i < R.qs.length - 1) { R.i++; Review.paint(); } else Review.finish(); }
     };
     const f = $('#rf'); if (f) { const inp = $('input', f); inp.focus({ preventScroll: true }); f.onsubmit = e => { e.preventDefault(); if (!inp.value.trim()) return; inp.disabled = true; const v = norm(inp.value); answer([].concat(s.a).some(a => norm(a) === v)); }; }
   },

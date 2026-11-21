@@ -32,6 +32,9 @@ const Help = {
     const unread = mine.filter(q => { const a = Help.ans(pid, q.id); return a && a.r && (!q.rr || q.rr < a.u); }).length;
     const wait = mine.filter(q => Help.open(pid, q) && !(Help.ans(pid, q.id) || {}).r).length;
     b.className = unread ? 'hb-reply' : wait ? 'hb-wait' : '';
+    /* inside a lesson/test the floating button could sit on top of «next»: dock it in the lesson header instead */
+    const head = document.querySelector('.lhead');
+    if (head) { b.classList.add('inhead'); if (b.parentNode !== head) head.appendChild(b); } else if (b.parentNode !== document.body) document.body.appendChild(b);
     b.innerHTML = unread ? '💬 <span>ردّ أخوك!</span>' : wait ? '⏳ <span>أخبرت أخاك</span>' : '🙋 <span>اطلب المساعدة</span>';
     b.setAttribute('aria-label', 'اطلب المساعدة من أخيك');
   },
@@ -97,9 +100,12 @@ const Help = {
       ('Notification' in window ? (Notification.permission === 'granted' ? '<p class="muted" style="margin:6px 0 0;font-size:.85em">🔔 تنبيهات المتصفح مفعّلة على هذا الجهاز (تعمل ما دام التطبيق مفتوحاً في تبويب).</p>' : Notification.permission !== 'denied' ? '<button class="btn sm sec" id="hnotif" style="margin-top:6px">🔔 فعّل تنبيه المتصفح على هذا الجهاز</button>' : '') : '') + '</div>';
     h += open.length ? open.map(card).join('') : '<div class="card" style="text-align:center"><div style="font-size:44px">😌</div><b>لا توجد طلبات مفتوحة</b><p class="muted" style="margin:4px 0">أخواك يتقدّمان بلا مشاكل الآن.</p></div>';
     if (old.length) h += '<h3>السابقة</h3>' + old.map(card).join('');
+    const errs = []; Help.players().forEach(p => Object.values(Kid.of(p.id).ER || {}).forEach(e => errs.push(Object.assign({ name: p.name }, e)))); errs.sort((a, b) => b.u - a.u);
+    if (errs.length) h += '<details class="card"><summary><b>🐞 أخطاء تقنية ظهرت في التطبيق (' + errs.length + ')</b></summary><p class="muted" style="font-size:.85em">تُسجَّل تلقائياً. انسخها وأرسلها لمن يطوّر التطبيق ليصلحها.</p><pre class="hexv" id="errtxt" dir="ltr" style="white-space:pre-wrap;font-size:.8em">' + esc(errs.map(e => new Date(e.t).toISOString().slice(0, 16) + ' | ' + e.name + ' | ' + e.w + ' | ' + e.m + (e.n > 1 ? ' (x' + e.n + ')' : '') + (e.v ? ' | v' + e.v : '')).join('\n')) + '</pre><button class="btn sm sec" id="errcp">📋 انسخ</button></details>';
     return h;
   },
   mountCoach() {
+    const ec = $('#errcp'); if (ec) ec.onclick = async () => { try { await navigator.clipboard.writeText($('#errtxt').textContent); toast('نُسخ ✅'); } catch (e) { toast('حدّد النص وانسخه يدوياً'); } };
     const nb = $('#hnotif'); if (nb) nb.onclick = async () => { try { await Notification.requestPermission(); } catch (e) { } App.render(); };
     document.querySelectorAll('.hq[data-q]').forEach(box => {
       const key = box.dataset.q, [pid, id] = key.split('.'); const q = (Kid.of(pid).HQ || {})[id]; if (!q) return;
@@ -112,8 +118,9 @@ const Help = {
     });
   },
   /* coach devices: announce new requests once */
+  dock() { if (Help.mo) return; Help.mo = new MutationObserver(() => { const h = document.querySelector('.lhead'), b = document.getElementById('helpbtn'); if ((h && !(b && h.contains(b))) || (!h && b && b.parentNode !== document.body)) Help.paint(); }); Help.mo.observe(document.body, { childList: true, subtree: true }); },
   watch() {
-    Help.paint(); Help.checkReplies();
+    Help.dock(); Help.paint(); Help.checkReplies();
     const n = Dev.get().role === 'coach' ? Help.pending().length : 0; const dot = document.querySelector('#tabs .hdot'); if (dot) { dot.textContent = n; dot.hidden = !n; }
     if (Dev.get().role !== 'coach') return;
     const seen = Dev.get().hseen || {}; let fresh = null;

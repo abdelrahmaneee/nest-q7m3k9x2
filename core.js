@@ -66,7 +66,7 @@ const K_KID = 'oqab_kid', K_COACH = 'oqab_coach', K_DEV = 'oqab_dev', K_BAK = 'o
 const SCHEMA = 2;
 const PIDS = ['k1', 'k2', 'k3', 'k4'];
 
-function emptyKid() { return { v: SCHEMA, g: 0, name: '', nameU: 0, pledge: 0, L: {}, T: {}, C: {}, M: {}, G: {}, R: {}, D: {}, E: {}, W: {}, MR: {}, X: {}, HQ: {}, look: null }; }
+function emptyKid() { return { v: SCHEMA, g: 0, name: '', nameU: 0, pledge: 0, L: {}, T: {}, C: {}, M: {}, G: {}, R: {}, D: {}, E: {}, W: {}, MR: {}, X: {}, HQ: {}, ER: {}, look: null }; }
 function emptyCoach() { return { v: SCHEMA, pin: null, U: {}, msgs: {}, wk: null, wkh: {}, ctfU: {}, goal: null, HA: {} }; }
 function emptyProf() { return { v: SCHEMA, list: {} }; }
 
@@ -118,6 +118,7 @@ function mergeKid(a, b) {
   o.W = mergeMap(a.W, b.W, (x, y) => ({ d: minD(x.d, y.d), ans: ((x.ans || '').length !== (y.ans || '').length ? ((x.ans || '').length > (y.ans || '').length ? x.ans : y.ans) : ((x.ans || '') >= (y.ans || '') ? x.ans : y.ans)) }));
   o.look = lww(a.look, b.look);
   /* help requests: newest edit wins per request; keep the 40 newest */
+  o.ER = mergeMap(a.ER, b.ER, lww); { const ids = Object.keys(o.ER); if (ids.length > 15) { ids.sort((p, q) => (o.ER[q].u || 0) - (o.ER[p].u || 0) || (p < q ? -1 : 1)); for (const id of ids.slice(15)) delete o.ER[id]; } }
   o.HQ = mergeMap(a.HQ, b.HQ, lww); { const ids = Object.keys(o.HQ); if (ids.length > 40) { ids.sort((p, q) => (o.HQ[q].t || 0) - (o.HQ[p].t || 0) || (p < q ? -1 : 1)); for (const id of ids.slice(40)) delete o.HQ[id]; } }
   const E = Object.assign({}, b.E || {}, a.E || {});
   const ids = Object.keys(E);
@@ -220,6 +221,8 @@ const Kid = (() => {
       if (ok) today().rx = (today().rx || 0) + 1;
     },
     addCard(qid, ok) { if (!live()) return; if (!s.R[qid]) s.R[qid] = { b: ok ? 1 : 0, due: addDays(dayKey(), 1), u: now() }; },
+    /* technical errors the player hit: shown to the coach so they can be fixed */
+    logErr(m, w, v) { if (!pid || pid === 'demo' || App.preview) return; s.ER = s.ER || {}; const old = Object.entries(s.ER).find(([, e]) => e.m === m && e.w === w); if (old) { old[1].n = (old[1].n || 1) + 1; old[1].u = now(); } else s.ER[rid(6)] = { t: now(), u: now(), m, w, v, n: 1 }; save(); },
     askHelp(o) { if (!live()) return null; const id = rid(8); s.HQ[id] = Object.assign({}, o, { t: now(), u: now() }); save(); return id; },
     helpEdit(id, patch) { if (!live() || !s.HQ[id]) return; s.HQ[id] = Object.assign({}, s.HQ[id], patch, { u: now() }); save(); },
     flag(k) { if (!live()) return false; if (s.X[k]) return false; s.X[k] = now(); save(); return true; },
