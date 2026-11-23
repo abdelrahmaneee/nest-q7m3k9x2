@@ -403,3 +403,9 @@ table.t th{color:var(--muted);font-size:.85em}
 .trace .tctl{justify-content:space-between;align-items:center;margin-top:10px}
 .order-item code.pl{white-space:pre;background:none;padding:0;border:0;font:600 .95em var(--f-mono);color:var(--ink)}
 .order-list.code .order-item{direction:ltr}.order-list.code .order-item .mv{margin-inline-start:auto}
+
+.story .sdots{display:flex;gap:5px;justify-content:center;margin-bottom:8px}.story .sdots i{width:9px;height:9px;border-radius:50%;background:var(--line)}.story .sdots i.d{background:var(--primary2)}.story .sdots i.c{background:var(--gold);transform:scale(1.3)}
+.story .stitle{display:block;text-align:center;margin-bottom:6px}
+.story .sbig{font-size:34px;line-height:1.5;text-align:center;white-space:pre-wrap;overflow-x:auto;background:var(--bg2);border-radius:12px;padding:8px;margin-bottom:8px}
+.story .sbig small{font-size:.42em;display:block;line-height:1.5}
+.story .sm{line-height:1.9;min-height:3em}

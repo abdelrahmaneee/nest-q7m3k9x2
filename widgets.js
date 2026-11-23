@@ -322,6 +322,30 @@ const Widgets = {
   /* ---- generic image/emoji card ---- */
   card(w, el, api) { el.innerHTML = '<div class="wbox" style="text-align:center">' + (w.big ? '<div dir="ltr" style="font-size:44px;line-height:1.4;white-space:nowrap;overflow-x:auto">' + w.big + '</div>' : '') + (w.html || '') + '</div>'; api.done && api.done(); },
 
+  /* ---- story: a process shown frame by frame (like slow motion for ideas: a packet's trip, a DNS lookup...).
+     w.frames = [{ big: 'emoji diagram (LTR)', m: 'markdown', ask: { q, o, a, h } }]  ask is answered before that frame is revealed ---- */
+  story(w, el, api) {
+    const F = w.frames; let k = 0, ok = {}, wrongs = 0, ended = false;
+    const draw = () => {
+      const f = F[k], nx = F[k + 1], A = nx && nx.ask && !ok[k + 1] ? nx.ask : null;
+      let h = '<div class="wbox story"><div class="sdots">' + F.map((x, i) => '<i class="' + (i < k ? 'd' : i === k ? 'c' : '') + '"></i>').join('') + '</div>';
+      if (w.title) h += '<b class="stitle">' + md(w.title) + '</b>';
+      h += (f.big ? '<div class="sbig" dir="ltr">' + f.big + '</div>' : '') + '<div class="sm">' + md(f.m || '') + '</div>';
+      if (A) h += '<div class="tq"><b>🔮 توقّع قبل أن تكمل:</b> ' + md(A.q) + '<div class="opts">' + A.o.map((x, i) => '<button class="opt" data-sa="' + i + '">' + md(x) + '</button>').join('') + '</div></div>';
+      h += '<div class="row tctl"><button class="btn sm sec" data-sp="1"' + (k === 0 ? ' disabled' : '') + '>⏮ السابق</button><span class="muted">' + (k + 1) + ' / ' + F.length + '</span>' + (nx ? '<button class="btn sm" data-sn="1"' + (A ? ' disabled' : '') + '>⏭ التالي</button>' : '<button class="btn sm sec" data-sr="1">↺ من البداية</button>') + '</div></div>';
+      el.innerHTML = h;
+      if (!nx && !ended) { ended = true; api.done(w.yes || 'أحسنت! شاهدت القصة كاملة.'); if (w.medal) api.medal(w.medal); }
+    };
+    draw();
+    el.onclick = e => {
+      const a = e.target.closest('[data-sa]');
+      if (a) { const A = F[k + 1].ask; if (+a.dataset.sa === A.a) { ok[k + 1] = 1; wrongs = 0; Snd.ok(); api.fb(true, 'توقّع صحيح! اضغط ⏭ لترى.'); draw(); } else { wrongs++; api.wrong(); a.classList.add('wrong'); a.disabled = true; api.fb(false, wrongs > 1 && A.h ? A.h : 'فكّر مرة أخرى، وانظر إلى الرسم.'); } return; }
+      if (e.target.closest('[data-sn]')) { if (k < F.length - 1) { k++; Snd.click(); draw(); } return; }
+      if (e.target.closest('[data-sp]')) { if (k > 0) { k--; Snd.click(); draw(); } return; }
+      if (e.target.closest('[data-sr]')) { k = 0; Snd.click(); draw(); }
+    };
+  },
+
   /* ---- slow-motion run: execute a program line by line, watch the boxes (variables) and the screen.
      w.tr = trace made by tools/mktrace.py ; w.ask = [{at, q, o, a}] predictions asked before step «at» is revealed ---- */
   trace(w, el, api) {
