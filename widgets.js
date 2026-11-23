@@ -322,6 +322,40 @@ const Widgets = {
   /* ---- generic image/emoji card ---- */
   card(w, el, api) { el.innerHTML = '<div class="wbox" style="text-align:center">' + (w.big ? '<div dir="ltr" style="font-size:44px;line-height:1.4;white-space:nowrap;overflow-x:auto">' + w.big + '</div>' : '') + (w.html || '') + '</div>'; api.done && api.done(); },
 
+  /* ---- folder explorer: click folders like in a file window, see the path and the matching terminal command ---- */
+  tree(w, el, api) {
+    const root = { c: {} }; const build = (o, n) => { for (const k in o) { if (typeof o[k] === 'object') { n.c[k] = { c: {} }; build(o[k], n.c[k]); } else n.c[k] = { f: o[k] }; } }; build(w.fs, root);
+    let cwd = (w.cwd || '/home/oqab').split('/').filter(Boolean), open = null, showHid = false, log = [], gi = 0; const goals = w.goals || [];
+    const node = parts => parts.reduce((n, p) => n && n.c && n.c[p], root);
+    const pth = parts => '/' + parts.join('/');
+    const icon = (n, nd) => nd.c ? '📁' : /\.(png|jpe?g|gif)$/i.test(n) ? '🖼️' : /\.(mp3|wav)$/i.test(n) ? '🎵' : /\.(mp4|avi)$/i.test(n) ? '🎬' : /\.py$/i.test(n) ? '🐍' : /\.exe$/i.test(n) ? '⚙️' : '📝';
+    const say = c => { log.push(c); log = log.slice(-4); };
+    const check = (p) => { if (gi < goals.length && p === goals[gi].p) { gi++; Snd.ok(); if (gi === goals.length) { draw(); api.done(w.yes || 'أحسنت! هكذا يعمل المسار.'); if (w.medal) api.medal(w.medal); return true; } } return false; };
+    const draw = () => {
+      const n = node(cwd); const names = Object.keys(n.c).filter(x => showHid || !x.startsWith('.')).sort((a, b) => (!!n.c[b].c - !!n.c[a].c) || (a < b ? -1 : 1));
+      let h = '<div class="wbox tree">';
+      if (goals.length) h += '<div class="tgoals">' + goals.map((g, i) => '<div class="' + (i < gi ? 'ok' : i === gi ? 'now' : '') + '">' + (i < gi ? '✅' : i === gi ? '👉' : '⬜') + ' ' + md(g.d) + '</div>').join('') + '</div>';
+      h += '<div class="tpath"><span>📍 أنت هنا:</span><div class="crumbs" dir="ltr"><button data-go="0">/</button>' + cwd.map((p, i) => '<b>›</b><button data-go="' + (i + 1) + '">' + esc(p) + '</button>').join('') + '</div><code dir="ltr">' + esc(pth(cwd)) + '</code></div>';
+      h += '<div class="titems">' + (cwd.length ? '<button class="titem up" data-up="1"><span>⬆️</span>رجوع للدرج الأكبر</button>' : '') + names.map(x => '<button class="titem' + (n.c[x].c ? ' dir' : '') + (open === x ? ' on' : '') + '" data-n="' + esc(x) + '"><span>' + icon(x, n.c[x]) + '</span><bdi dir="ltr">' + esc(x) + '</bdi></button>').join('') + (names.length ? '' : '<p class="muted" style="margin:6px">هذا الدرج فارغ.</p>') + '</div>';
+      if (w.hidden) h += '<button class="btn sm sec" data-hid="1" style="margin-top:6px">' + (showHid ? '🙈 أخفِ الملفات المخفية' : '👁️ أظهر المخفي (مثل ls -a)') + '</button>';
+      if (open && n.c[open] && !n.c[open].c) h += '<div class="tfile"><b dir="ltr">📄 ' + esc(open) + '</b><div>' + (/\.(txt|md|py|html|csv)$/i.test(open) || !/\./.test(open.slice(1)) ? esc(n.c[open].f).replace(/\n/g, '<br>') : '<span class="muted">(هذا ملف ' + (icon(open, n.c[open]) === '🖼️' ? 'صورة' : 'ليس نصاً') + '، الطرفية تعرف اسمه ومكانه فقط)</span>') + '</div></div>';
+      if (w.mirror !== false) h += '<div class="tmirror"><small>🖥️ لو كنت في الطرفية لكتبت:</small><pre dir="ltr">' + (log.length ? log.map(c => '$ ' + esc(c)).join('\n') : '$ ') + '</pre></div>';
+      el.innerHTML = h + '</div>';
+    };
+    draw();
+    el.onclick = e => {
+      const up = e.target.closest('[data-up]'), go = e.target.closest('[data-go]'), it = e.target.closest('[data-n]'), hid = e.target.closest('[data-hid]');
+      if (hid) { showHid = !showHid; if (showHid) say('ls -a'); Snd.click(); draw(); return; }
+      if (up) { cwd = cwd.slice(0, -1); open = null; say('cd ..'); Snd.click(); if (!check(pth(cwd))) draw(); return; }
+      if (go) { const k = +go.dataset.go; if (k === cwd.length) return; cwd = cwd.slice(0, k); open = null; say('cd ' + pth(cwd)); Snd.click(); if (!check(pth(cwd))) draw(); return; }
+      if (it) {
+        const x = it.dataset.n, nd = node(cwd).c[x]; if (!nd) return; Snd.click();
+        if (nd.c) { cwd = cwd.concat(x); open = null; say('cd ' + x); if (!check(pth(cwd))) draw(); }
+        else { open = x; say('cat ' + x); if (!check(pth(cwd.concat(x)))) draw(); }
+      }
+    };
+  },
+
   /* ---- sorting game: swap neighbours until sorted ---- */
   sortgame(w, el, api) {
     let a = (w.nums || shuffle([3, 9, 1, 7, 4, 6])).slice(); while (a.every((x, i) => i === 0 || a[i - 1] <= x)) a = shuffle(a);

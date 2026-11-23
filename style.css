@@ -365,3 +365,22 @@ table.t th{color:var(--muted);font-size:.85em}
 [data-stage="2"] .mdpre,[data-th="night"] .mdpre{background:rgba(255,255,255,.06)}
 
 #helpbtn.inhead{position:static;flex:none;box-shadow:none;padding:4px 9px;font-size:1.15em;border-width:2px}#helpbtn.inhead span{display:none}
+
+.revbar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;background:color-mix(in srgb,var(--gold) 18%,var(--card));border:2px solid color-mix(in srgb,var(--gold) 55%,var(--line));border-radius:14px;padding:6px 10px;margin:0 0 10px;font-weight:700}
+.lfoot .btn.bk{flex:0 0 auto;padding-inline:14px}
+.recap-note{font-weight:700;margin:4px 0 8px;color:var(--ink)}
+.opt.dim{opacity:.55}
+.recap-ol{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:10px 34px;line-height:2}
+
+.tree .tgoals{display:grid;gap:4px;margin-bottom:10px;font-size:.95em}.tree .tgoals .ok{opacity:.6}.tree .tgoals .now{font-weight:800}
+.tree .tpath{display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--bg2);border:2px solid var(--line);border-radius:12px;padding:6px 8px;margin-bottom:10px}
+.tree .tpath code{flex-basis:100%;font-family:var(--f-mono);font-size:.95em;color:var(--ink);opacity:.85}
+.tree .crumbs{display:flex;align-items:center;gap:3px;flex-wrap:wrap}.tree .crumbs button{background:var(--card);border:2px solid var(--line);border-radius:8px;padding:2px 8px;font:700 .95em var(--f-mono);color:var(--ink);cursor:pointer}.tree .crumbs b{opacity:.5}
+.tree .titems{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.tree .titem{display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--card);border:2px solid var(--line);border-radius:12px;padding:8px 4px;cursor:pointer;color:var(--ink);font:600 .85em var(--f-mono);word-break:break-all}
+.tree .titem span{font-size:2em;line-height:1.1}.tree .titem.dir{border-color:color-mix(in srgb,var(--primary) 45%,var(--line))}.tree .titem.on{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 15%,var(--card))}
+.tree .titem.up{font-family:inherit;border-style:dashed}
+.tree .tfile{margin-top:10px;background:var(--bg2);border:2px solid var(--line);border-radius:12px;padding:8px 10px}.tree .tfile b{display:block;font-family:var(--f-mono);margin-bottom:4px}
+.tree .tmirror{margin-top:10px}.tree .tmirror pre{background:#0B1220;color:#7CF0C0;border-radius:10px;padding:8px 10px;margin:4px 0 0;font:600 .95em var(--f-mono);white-space:pre-wrap;min-height:1.6em}
+.narrow{display:none}
+@media (max-width:420px){.lfoot .wide,.revbar .wide{display:none}.lfoot .narrow{display:inline}.lfoot .btn.bk{min-width:52px;padding-inline:10px}.revbar{padding:4px 8px;font-size:.9em}.revbar .btn.sm{padding:4px 10px}}

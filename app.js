@@ -453,7 +453,7 @@ const App = {
 function unitById(id) { return C.units.find(u => u.id === id); }
 const QIDX = {};
 function buildIndex() {
-  const add = (u) => u.lessons.forEach(l => l.steps.forEach((s, i) => { if (s.t === 'q' || s.t === 'in') QIDX[u.id + '.' + l.id + '.' + i] = { s, u, l }; }));
+  const add = (u) => u.lessons.forEach(l => l.steps.forEach((s, i) => { if (s.t === 'q' || s.t === 'in') QIDX[u.id + '.' + l.id + '.' + (s.qi != null ? s.qi : i)] = { s, u, l }; }));
   C.units.forEach(add);
   C.units.forEach(u => (u.test || []).forEach((s, i) => { QIDX[u.id + '.t.' + i] = { s, u, l: null }; }));
 }
@@ -749,31 +749,36 @@ const Lesson = {
     const key = u.id + '.' + l.id;
     Kid.lessonStart(key);
     App.lessonKey = key; App.celeOK = false;
-    const L = { u, l, key, i: App.preview && App.helpJump != null ? Math.min(App.helpJump, l.steps.length - 1) : 0, ok: false, steps: l.steps, xpBefore: D.xp, rank: D.rank };
-    Lesson.cur = L;
+    const L = { u, l, key, i: App.preview && App.helpJump != null ? Math.min(App.helpJump, l.steps.length - 1) : 0, max: 0, solved: {}, ok: false, steps: l.steps, xpBefore: D.xp, rank: D.rank };
+    L.max = L.i; Lesson.cur = L;
     return { html: '<div id="lesson"></div>', mount() { Lesson.paint(); } };
   },
   paint() {
     const L = Lesson.cur; const s = L.steps[L.i]; const total = L.steps.length;
     const night = document.documentElement.dataset.stage === '2';
-    L.ok = !Lesson.blocking(s); L.simpleShown = false;
-    let h = '<div class="lhead"><button class="x" data-l="exit" aria-label="خروج">' + ic('x', 22) + '</button><div class="bar"><i style="width:' + Math.round(L.i / total * 100) + '%"></i></div><small class="muted">' + (L.i + 1) + '/' + total + '</small></div>';
+    /* going back: earlier steps open read-only (answers shown, nothing counted); progress stays at L.max */
+    const back = L.i < L.max, recap = back || !!L.solved[L.i];
+    L.ok = recap || !Lesson.blocking(s); L.simpleShown = false;
+    let h = '<div class="lhead"><button class="x" data-l="exit" aria-label="خروج">' + ic('x', 22) + '</button><div class="bar"><i style="width:' + Math.round(L.max / total * 100) + '%"></i></div><small class="muted">' + (L.i + 1) + '/' + total + '</small></div>';
+    if (back) h += '<div class="revbar"><span>👀 خطوة سابقة<span class="wide"> · تقدّمك محفوظ</span></span><button class="btn sm" data-l="resume">⏩ ارجع لمكاني</button></div>';
     if (L.i === 0) h += '<h2 style="margin:0 0 6px">' + esc(L.l.title) + '</h2>';
     const mood = s.mood || (s.t === 'say' ? 'idle' : 'think');
     const text = s.m || s.q || '';
     if (text) h += '<div class="mentor">' + Art.eagle(mood, L.rank, night) + '<div class="bubble">' + md(text) + '<div id="simple"></div></div></div>';
     h += '<div id="stage"></div><div id="fb"></div>';
-    h += '<div class="lfoot">' + (s.s ? '<button class="btn sec" data-l="simple">' + ic('bulb', 20) + 'اشرح لي بطريقة أبسط</button>' : '') + '<button class="btn' + (L.ok ? '' : ' wait') + '" data-l="next" id="nextBtn" aria-disabled="' + (L.ok ? 'false' : 'true') + '">' + (L.i === total - 1 ? 'أنهيت الدرس!' : 'التالي') + '</button></div>';
+    h += '<div class="lfoot">' + (L.i > 0 ? '<button class="btn sec bk" data-l="back" aria-label="الخطوة السابقة" title="الخطوة السابقة">→<span class="wide"> السابق</span></button>' : '') + (s.s ? '<button class="btn sec" data-l="simple">' + ic('bulb', 20) + '<span class="wide">اشرح لي بطريقة أبسط</span><span class="narrow">اشرح أبسط</span></button>' : '') + '<button class="btn' + (L.ok ? '' : ' wait') + '" data-l="next" id="nextBtn" aria-disabled="' + (L.ok ? 'false' : 'true') + '">' + (L.i === total - 1 ? 'أنهيت الدرس!' : 'التالي') + '</button></div>';
     const root = $('#lesson'); root.innerHTML = h;
     const stage = $('#stage');
-    const api = Lesson.api(s, L);
-    try { Steps.render(s, stage, api, L); } catch (e) { App.err((e && e.message) || e); stage.innerHTML = '<div class="feedback bad">حدث خطأ في هذا الجزء. اضغط التالي.</div>'; api.done(); }
+    const api = recap ? Lesson.quietApi(L) : Lesson.api(s, L);
+    try { if (recap && Steps.recap(s, stage)) { } else Steps.render(s, stage, api, L); } catch (e) { App.err((e && e.message) || e); stage.innerHTML = '<div class="feedback bad">حدث خطأ في هذا الجزء. اضغط التالي.</div>'; api.done(); }
     root.onclick = e => {
       const b = e.target.closest('[data-l]'); if (!b) return;
       const a = b.dataset.l;
-      if (a === 'exit') { if (L.i === 0 || confirm('تخرج من الدرس؟ ستبدأه من جديد لاحقاً.')) App.go('unit/' + L.u.id); }
-      if (a === 'simple') { Snd.click(); if (!L.simpleShown) { L.simpleShown = true; Kid.lessonHint(L.key); } $('#simple').innerHTML = '<div class="simpler">' + md(s.s) + '</div>'; }
-      if (a === 'next') { if (!L.ok) { Lesson.nudge(); return; } Snd.click(); if (L.i < total - 1) { L.i++; Lesson.paint(); window.scrollTo(0, 0); } else Lesson.finish(); }
+      if (a === 'exit') { if (L.max === 0 || confirm('تخرج من الدرس؟ ستبدأه من جديد لاحقاً.')) App.go('unit/' + L.u.id); }
+      if (a === 'back') { if (L.i > 0) { Snd.click(); L.i--; Lesson.paint(); window.scrollTo(0, 0); } return; }
+      if (a === 'resume') { Snd.click(); L.i = L.max; Lesson.paint(); window.scrollTo(0, 0); return; }
+      if (a === 'simple') { Snd.click(); if (!L.simpleShown) { L.simpleShown = true; if (!recap) Kid.lessonHint(L.key); } $('#simple').innerHTML = '<div class="simpler">' + md(s.s) + '</div>'; }
+      if (a === 'next') { if (!L.ok) { Lesson.nudge(); return; } Snd.click(); if (L.i < total - 1) { L.i++; if (L.i > L.max) L.max = L.i; Lesson.paint(); window.scrollTo(0, 0); } else Lesson.finish(); }
     };
   },
   /* the player pressed «next» before finishing the exercise: show where to look instead of ignoring the tap */
@@ -783,15 +788,19 @@ const Lesson = {
   },
   blocking(s) { return ['q', 'in', 'sort', 'order', 'match', 'do', 'sh', 'py'].includes(s.t) || (s.t === 'say' && s.w && s.w.goal); },
   api(s, L) {
-    const qid = L.key + '.' + L.i;
+    const qid = L.key + '.' + (s.qi != null ? s.qi : L.i), at = L.i;
     return {
-      done(msg) { L.ok = true; const b = $('#nextBtn'); if (b) { b.disabled = false; b.classList.remove('wait'); b.setAttribute('aria-disabled', 'false'); b.focus({ preventScroll: true }); } if (msg) Lesson.fb(true, msg); },
+      done(msg) { L.ok = true; L.solved[at] = 1; const b = $('#nextBtn'); if (b) { b.disabled = false; b.classList.remove('wait'); b.setAttribute('aria-disabled', 'false'); b.focus({ preventScroll: true }); } if (msg) Lesson.fb(true, msg); },
       wrong(tag) { Kid.lessonWrong(L.key, tag || s.tag); },
       fb: Lesson.fb, qid,
       card(ok) { Kid.addCard(qid, ok); },
       medal(id) { if (Kid.medal(id)) toast('🏅 ربحت ميدالية: ' + MEDALS[id].n); },
       hint() { Kid.lessonHint(L.key); }
     };
+  },
+  /* used when re-opening an earlier step: practice freely, nothing is recorded */
+  quietApi(L) {
+    return { done(msg) { L.ok = true; const b = $('#nextBtn'); if (b) { b.classList.remove('wait'); b.setAttribute('aria-disabled', 'false'); } if (msg) Lesson.fb(true, msg); }, wrong() { }, fb: Lesson.fb, qid: '', card() { }, medal() { }, hint() { } };
   },
   fb(ok, msg, why) {
     const f = $('#fb'); if (!f) return;
@@ -882,6 +891,16 @@ const Steps = {
       if (ri === sel) { done[sel] = 1; sel = null; Snd.ok(); draw(); if (Object.keys(done).length === s.pairs.length) { api.card(true); api.fb(true, s.yes || 'وصّلتها كلها!', s.why); api.done(); } }
       else { api.wrong(); r.classList.add('wrong'); Snd.bad(); setTimeout(() => r.classList.remove('wrong'), 400); }
     };
+  },
+  /* read-only view of an exercise already solved: show the right answer to remember it */
+  recap(s, el) {
+    const note = '<div class="recap-note">✅ حللت هذا التمرين. هذه الإجابة الصحيحة لتتذكّرها:</div>', code = s.code ? '<pre class="hexv">' + esc(s.code) + '</pre>' : '';
+    if (s.t === 'q') { el.innerHTML = note + code + '<div class="opts">' + s.o.map((x, i) => '<div class="opt ' + (i === s.a ? 'right' : 'dim') + '">' + (i === s.a ? '✅ ' : '') + md(x) + '</div>').join('') + '</div>' + (s.why ? '<div class="feedback ok"><div class="why">' + md(s.why) + '</div></div>' : ''); return true; }
+    if (s.t === 'in') { el.innerHTML = note + code + '<div class="opt right"' + (s.ltr ? ' dir="ltr" style="text-align:left"' : '') + '>✅ <span class="' + (s.ltr ? 'mono' : '') + '">' + esc([].concat(s.a)[0]) + '</span></div>'; return true; }
+    if (s.t === 'order') { el.innerHTML = note + '<ol class="recap-ol">' + s.items.map(x => '<li>' + md(x) + '</li>').join('') + '</ol>'; return true; }
+    if (s.t === 'match') { el.innerHTML = note + '<table class="t">' + s.pairs.map(p => '<tr><td>' + md(p[0]) + '</td><td style="width:30px;text-align:center">⟵</td><td>' + md(p[1]) + '</td></tr>').join('') + '</table>'; return true; }
+    if (s.t === 'sort' && s.buckets) { el.innerHTML = note + s.buckets.map((b, bi) => '<div class="wbox" style="margin:8px 0"><b>' + md(b) + '</b><ul style="margin:6px 0 0">' + s.items.filter(it => it[1] === bi).map(it => '<li>' + md(it[0]) + '</li>').join('') + '</ul></div>').join(''); return true; }
+    return false;
   },
   do(s, el, api) { Widgets.mount(s.w, el, api); },
   sh(s, el, api) { Term.mission(s, el, api); },

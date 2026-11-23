@@ -2,16 +2,19 @@
    C.enrich(uid, lid, ops)
    op = { at: رقم الخطوة الأصلية (تُدرج قبلها) أو 'end', steps: [...] }
    op = { simple: رقم الخطوة الأصلية, s: 'شرح أبسط' }  ← يضيف زر «اشرح لي بطريقة أبسط» لخطوة لم يكن لها */
-C.enrich = function (uid, lid, ops) {
+/* opt.keepQ: freeze the review-card ids of the steps that already exist (s.qi = their index now), so inserting
+   new steps later never moves a child's saved review cards to a different question. New steps get their own ids. */
+C.enrich = function (uid, lid, ops, opt) {
   const u = C.units.find(x => x.id === uid); const l = u && u.lessons.find(x => x.id === lid);
   if (!l) { if (typeof console !== 'undefined') console.warn('enrich: لا يوجد درس', uid, lid); return; }
   if (!l.tagged) { l.steps.forEach((s, i) => { s.oi = i; }); l.tagged = 1; }
+  if (opt && opt.keepQ) { l.steps.forEach((s, i) => { if (s.qi == null) s.qi = i; }); }
   let added = 0;
   ops.forEach(op => {
     if (op.simple != null) { const st = l.steps.find(s => s.oi === op.simple); if (st && !st.s) st.s = op.s; return; }
     const pos = op.at === 'end' ? l.steps.length : l.steps.findIndex(s => s.oi === op.at);
     if (pos < 0) { if (typeof console !== 'undefined') console.warn('enrich: خطوة غير موجودة', uid, lid, op.at); return; }
-    l.steps.splice(pos, 0, ...op.steps.map(s => Object.assign({ ex: 1 }, s)));
+    l.steps.splice(pos, 0, ...op.steps.map((s, k) => Object.assign({ ex: 1 }, opt && opt.keepQ ? { qi: (opt.tag || 'n') + (added + k) } : {}, s)));
     added += op.steps.length;
   });
   l.mins = (l.mins || 8) + Math.round(added * 0.8);
