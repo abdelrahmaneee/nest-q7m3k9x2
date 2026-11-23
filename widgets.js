@@ -322,6 +322,51 @@ const Widgets = {
   /* ---- generic image/emoji card ---- */
   card(w, el, api) { el.innerHTML = '<div class="wbox" style="text-align:center">' + (w.big ? '<div dir="ltr" style="font-size:44px;line-height:1.4;white-space:nowrap;overflow-x:auto">' + w.big + '</div>' : '') + (w.html || '') + '</div>'; api.done && api.done(); },
 
+  /* ---- slow-motion run: execute a program line by line, watch the boxes (variables) and the screen.
+     w.tr = trace made by tools/mktrace.py ; w.ask = [{at, q, o, a}] predictions asked before step «at» is revealed ---- */
+  trace(w, el, api) {
+    const T = typeof w.tr === 'string' ? C.TR[w.tr] : w.tr; const st = T.steps, lines = T.code.split('\n');
+    const asks = {}; (w.ask || T.ask || []).forEach(a => { asks[a.at] = a; });
+    let k = -1, answered = {}, wrongs = 0, ended = false;
+    const ind = t => (t.match(/^ */) || [''])[0].length;
+    const val = v => '<bdi dir="ltr" class="mono">' + esc(v) + '</bdi>';
+    const said = i => {
+      const S = st[i], P = i > 0 ? st[i - 1] : { g: {}, v: {}, o: '', f: null }, line = (lines[S.l - 1] || '').trim(), out = [];
+      if (w.notes && w.notes[i]) return md(w.notes[i]);
+      if (S.back) return '↩️ رجعنا إلى السطر ' + S.l + ' ومعنا الجواب، فأكملنا ما كان ينتظره.' + (S.o.length > P.o.length ? '<br>🖥️ طُبع: ' + val(S.o.slice(P.o.length).trim()) : '');
+      if (S.r != null) return '🎁 الآلة <b dir="ltr">' + esc(S.f) + '</b> أعادت ' + val(S.r) + ' بأمر <span class="mono">return</span>.';
+      if (/^def /.test(line)) return '📝 Python حفظ <b>وصفة</b> الآلة <b dir="ltr">' + esc(line.slice(4).split('(')[0]) + '</b>، لكنه لم يشغّلها بعد. ستعمل فقط عندما نستدعيها.';
+      if (S.f && S.f !== P.f && !P.back) out.push('📞 قفزنا إلى داخل الآلة <b dir="ltr">' + esc(S.f) + '</b>' + (Object.keys(S.v).length ? ' ووضعنا القيم في صناديقها: ' + Object.keys(S.v).map(n => '<b dir="ltr">' + esc(n) + '</b> = ' + val(S.v[n])).join('، ') : ''));
+      const N = st[i + 1];
+      if (N && N.f && N.f !== S.f && !N.back && !/^def /.test(line)) out.push('📞 هذا السطر <b>يستدعي</b> الآلة <b dir="ltr">' + esc(N.f) + '</b>، فسيقفز Python الآن إلى داخلها، ثم يرجع إلى هنا بالجواب.');
+      if (/^(if|elif|while) /.test(line)) { const inside = N && N.l > S.l && ind(lines[N.l - 1] || '') > ind(lines[S.l - 1]); out.push(inside ? '✅ الشرط <b>صحيح</b>، فندخل إلى الأسطر التي تحته.' : (/^while/.test(line) ? '✋ الشرط <b>خطأ</b>، فتتوقّف الحلقة.' : '❌ الشرط <b>خطأ</b>، فنتخطّى الأسطر التي تحته.')); }
+      if (/^for /.test(line)) { const inside = N && N.l > S.l && ind(lines[N.l - 1] || '') > ind(lines[S.l - 1]); out.push(inside ? '🔁 دورة جديدة!' : '✋ انتهت العناصر، فتتوقّف الحلقة.'); }
+      const scope = S.f ? S.v : S.g, prev = S.f ? (P.f === S.f ? P.v : {}) : P.g;
+      Object.keys(scope).forEach(n => { if (!(n in prev)) out.push('📦 صندوق جديد <b dir="ltr">' + esc(n) + '</b> وفيه ' + val(scope[n])); else if (prev[n] !== scope[n]) out.push('🔄 <b dir="ltr">' + esc(n) + '</b> كان ' + val(prev[n]) + ' وصار ' + val(scope[n]) + ' (القديم رُمي 🗑️)'); });
+      if (S.o.length > P.o.length) out.push('🖥️ ظهر على الشاشة: ' + val(S.o.slice(P.o.length).trim()));
+      return out.join('<br>') || 'نُفّذ السطر ' + S.l + '.';
+    };
+    const boxes = (o, p, title) => '<div class="tbx"><small>' + title + '</small><div class="tvars">' + (Object.keys(o).length ? Object.keys(o).map(n => '<span class="tvar' + (p && p[n] !== o[n] ? ' ch' : '') + '" dir="ltr"><b>' + esc(n) + '</b><em>=</em>' + (p && n in p && p[n] !== o[n] ? '<s dir="ltr">' + esc(p[n]) + '</s>' : '') + '<i dir="ltr">' + esc(o[n]) + '</i></span>').join('') : '<span class="muted">(لا صناديق بعد)</span>') + '</div></div>';
+    const draw = () => {
+      const S = k >= 0 ? st[k] : null, P = k > 0 ? st[k - 1] : null, A = asks[k + 1];
+      let h = '<div class="wbox trace"><div class="tcode" dir="ltr">' + lines.map((t, i) => '<div class="' + (S && S.l === i + 1 ? 'cur' : '') + (S && st[k + 1] && st[k + 1].l === i + 1 && !A ? ' nxt' : '') + '"><span class="ln">' + (i + 1) + '</span><code>' + (esc(t) || ' ') + '</code></div>').join('') + '</div>';
+      h += '<div class="tsay">' + (S ? '<b>السطر ' + S.l + ':</b> ' + said(k) : '👆 هذا البرنامج لم يعمل بعد. اضغط <b>⏭ التالي</b> لينفّذ Python أول سطر، وراقب ما يحدث.') + '</div>';
+      h += '<div class="tpanels">' + boxes(S ? S.g : {}, P ? P.g : null, '📦 صناديق البرنامج') + (S && S.f ? boxes(S.v, P && P.f === S.f ? P.v : {}, '⚙️ داخل الآلة ' + esc(S.f)) : '') + '<div class="tbx"><small>🖥️ الشاشة</small><pre dir="auto">' + esc(S ? S.o : '') + '</pre></div></div>';
+      if (A && !answered[k + 1]) h += '<div class="tq"><b>🔮 توقّع قبل أن تضغط:</b> ' + md(A.q) + '<div class="opts">' + A.o.map((x, i) => '<button class="opt" data-ta="' + i + '">' + md(x) + '</button>').join('') + '</div></div>';
+      h += '<div class="row tctl"><button class="btn sm sec" data-tp="1"' + (k < 0 ? ' disabled' : '') + '>⏮ السابق</button><span class="muted">' + Math.max(0, k + 1) + ' / ' + st.length + '</span>' + (k < st.length - 1 ? '<button class="btn sm" data-tn="1"' + (A && !answered[k + 1] ? ' disabled' : '') + '>⏭ التالي</button>' : '<button class="btn sm sec" data-tr="1">↺ من البداية</button>') + '</div></div>';
+      el.innerHTML = h;
+      if (k === st.length - 1 && !ended) { ended = true; api.done(w.yes || 'انتهى البرنامج! هكذا يقرأ Python الكود: سطراً سطراً، ويغيّر الصناديق، ويطبع على الشاشة.'); if (w.medal) api.medal(w.medal); }
+    };
+    draw();
+    el.onclick = e => {
+      const a = e.target.closest('[data-ta]');
+      if (a) { const A = asks[k + 1]; if (+a.dataset.ta === A.a) { answered[k + 1] = 1; wrongs = 0; Snd.ok(); api.fb(true, 'توقّع صحيح! اضغط ⏭ لترى ذلك يحدث.'); draw(); } else { wrongs++; api.wrong(); a.classList.add('wrong'); a.disabled = true; api.fb(false, wrongs > 1 && A.h ? A.h : 'ليس تماماً. انظر إلى الصناديق والسطر الأصفر، وفكّر مرة أخرى.'); } return; }
+      if (e.target.closest('[data-tn]')) { if (k < st.length - 1) { k++; Snd.click(); draw(); } return; }
+      if (e.target.closest('[data-tp]')) { if (k >= 0) { k--; Snd.click(); draw(); } return; }
+      if (e.target.closest('[data-tr]')) { k = -1; Snd.click(); draw(); }
+    };
+  },
+
   /* ---- folder explorer: click folders like in a file window, see the path and the matching terminal command ---- */
   tree(w, el, api) {
     const root = { c: {} }; const build = (o, n) => { for (const k in o) { if (typeof o[k] === 'object') { n.c[k] = { c: {} }; build(o[k], n.c[k]); } else n.c[k] = { f: o[k] }; } }; build(w.fs, root);

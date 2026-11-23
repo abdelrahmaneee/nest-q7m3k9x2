@@ -384,3 +384,22 @@ table.t th{color:var(--muted);font-size:.85em}
 .tree .tmirror{margin-top:10px}.tree .tmirror pre{background:#0B1220;color:#7CF0C0;border-radius:10px;padding:8px 10px;margin:4px 0 0;font:600 .95em var(--f-mono);white-space:pre-wrap;min-height:1.6em}
 .narrow{display:none}
 @media (max-width:420px){.lfoot .wide,.revbar .wide{display:none}.lfoot .narrow{display:inline}.lfoot .btn.bk{min-width:52px;padding-inline:10px}.revbar{padding:4px 8px;font-size:.9em}.revbar .btn.sm{padding:4px 10px}}
+
+.trace .tcode{background:#0B1220;color:#E6EDF7;border-radius:12px;padding:8px 0;overflow-x:auto;font:600 .95em var(--f-mono)}
+.trace .tcode div{display:flex;gap:10px;padding:2px 10px;white-space:pre;border-inline-start:4px solid transparent}
+.trace .tcode .ln{opacity:.45;min-width:1.4em;text-align:right;user-select:none}
+.trace .tcode code{background:none;color:inherit;padding:0;white-space:pre;border:0;border-radius:0;font-size:1em}
+.trace .tcode .cur{background:rgba(255,211,107,.22);border-inline-start-color:#FFD36B}
+.trace .tcode .nxt{border-inline-start-color:rgba(124,240,192,.6)}
+.trace .tsay{margin:10px 0;padding:8px 12px;border-radius:12px;background:color-mix(in srgb,var(--primary2) 12%,var(--card));border:2px solid color-mix(in srgb,var(--primary2) 35%,var(--line));line-height:1.9}
+.trace .tpanels{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.trace .tbx{background:var(--bg2);border:2px solid var(--line);border-radius:12px;padding:6px 8px;min-width:0}
+.trace .tbx pre{margin:4px 0 0;min-height:1.6em;white-space:pre-wrap;font:600 .95em var(--f-mono);color:var(--ink)}
+.trace .tvars{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.trace .tvar{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:2px solid var(--line);border-radius:10px;padding:3px 8px;font-family:var(--f-mono);max-width:100%;overflow-wrap:anywhere}
+.trace .tvar i{font-style:normal;color:var(--ink)}.trace .tvar em{font-style:normal;opacity:.6}.trace .tvar s{opacity:.55;color:#E04B4B}
+.trace .tvar.ch{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 16%,var(--card))}
+.trace .tq{margin-top:10px}
+.trace .tctl{justify-content:space-between;align-items:center;margin-top:10px}
+.order-item code.pl{white-space:pre;background:none;padding:0;border:0;font:600 .95em var(--f-mono);color:var(--ink)}
+.order-list.code .order-item{direction:ltr}.order-list.code .order-item .mv{margin-inline-start:auto}
